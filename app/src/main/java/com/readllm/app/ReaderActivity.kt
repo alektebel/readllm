@@ -1,0 +1,530 @@
+package com.readllm.app
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.lifecycleScope
+import com.readllm.app.database.AppDatabase
+import com.readllm.app.llm.TextLLMService
+import com.readllm.app.model.Book
+import com.readllm.app.quiz.ComprehensionDashboard
+import com.readllm.app.quiz.ComprehensionQuizService
+import com.readllm.app.quiz.QuizResultsDialog
+import com.readllm.app.quiz.QuizScreen
+import com.readllm.app.reader.EpubReaderService
+import com.readllm.app.repository.BookRepository
+import com.readllm.app.repository.QuizRepository
+import com.readllm.app.tts.ReadAloudService
+import com.readllm.app.ui.HtmlText
+import com.readllm.app.ui.theme.ReadLLMTheme
+import kotlinx.coroutines.launch
+import java.io.File
+import kotlin.math.abs
+
+class ReaderActivity : ComponentActivity() {
+    
+    private lateinit var readAloudService: ReadAloudService
+    private lateinit var bookRepository: BookRepository
+    private lateinit var quizRepository: QuizRepository
+    private lateinit var epubReader: EpubReaderService
+    private lateinit var textLLMService: TextLLMService
+    private lateinit var quizService: ComprehensionQuizService
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        val database = AppDatabase.getDatabase(this)
+        bookRepository = BookRepository(database.bookDao())
+        quizRepository = QuizRepository(database.chapterScoreDao(), database.quizQuestionDao())
+        epubReader = EpubReaderService()
+        
+        // Initialize Text LLM Service for quiz generation
+        textLLMService = TextLLMService(this)
+        quizService = ComprehensionQuizService(textLLMService)
+        
+        // Initialize LLM model in background
+        lifecycleScope.launch {
+            textLLMService.initialize()
+        }
+        
+        val bookId = intent.getLongExtra("book_id", -1)
+        
+        readAloudService = ReadAloudService(this) { status ->
+            // Handle status changes
+        }
+        
+        setContent {
+            ReadLLMTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    var book by remember { mutableStateOf<Book?>(null) }
+                    var currentChapter by remember { mutableStateOf(0) }
+                    var chapterContent by remember { mutableStateOf("") }
+                    var totalChapters by remember { mutableStateOf(0) }
+                    var showQuiz by remember { mutableStateOf(false) }
+                    var currentQuestion by remember { mutableStateOf<ComprehensionQuizService.QuizQuestion?>(null) }
+                    var currentQuestionIndex by remember { mutableStateOf(0) }
+                    var quizQuestions by remember { mutableStateOf<List<ComprehensionQuizService.QuizQuestion>>(emptyList()) }
+                    var correctAnswersCount by remember { mutableStateOf(0) }
+                    var showQuizResults by remember { mutableStateOf(false) }
+                    var showDashboard by remember { mutableStateOf(false) }
+                    var fontSize by remember { mutableStateOf(18f) }
+                    var isPreparingQuiz by remember { mutableStateOf(false) }
+                    
+                    LaunchedEffect(bookId) {
+                        if (bookId != -1L) {
+                            book = bookRepository.getBookById(bookId)
+                            book?.let { loadedBook ->
+                                try {
+                                    val epubData = File(loadedBook.filePath).inputStream().use {
+                                        epubReader.loadEpub(it)
+                                    }
+                                    totalChapters = epubData.chapters.size
+                                    if (epubData.chapters.isNotEmpty()) {
+                                        chapterContent = epubData.chapters[0].content
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                    chapterContent = "Error loading book: ${e.message}"
+            }
+        }
+    }
+}
+
+/**
+ * Loading screen shown while AI prepares comprehension questions
+ */
+@Composable
+fun QuizPreparationScreen() {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(64.dp),
+                strokeWidth = 6.dp
+            )
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            Text(
+                text = "Preparing Questions...",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text(
+                text = "The AI is analyzing this chapter to create personalized comprehension questions for you.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .padding(top = 16.dp)
+            )
+        }
+    }
+}
+                    
+                    if (showDashboard) {
+                        var chapterScores by remember { mutableStateOf(emptyList<com.readllm.app.model.ChapterScoreEntity>()) }
+                        
+                        LaunchedEffect(bookId) {
+                            if (bookId != -1L) {
+                                quizRepository.getChapterScores(bookId).collect { scores ->
+                                    chapterScores = scores
+                                }
+                            }
+                        }
+                        
+                        ComprehensionDashboard(
+                            bookTitle = book?.title ?: "Book",
+                            chapterScores = chapterScores,
+                            onClose = { showDashboard = false }
+                        )
+                    } else if (isPreparingQuiz) {
+                        // Loading screen while AI prepares questions
+                        QuizPreparationScreen()
+                    } else if (showQuiz && currentQuestion != null) {
+                        Dialog(onDismissRequest = { /* Prevent dismissal during quiz */ }) {
+                            QuizScreen(
+                                question = currentQuestion!!,
+                                chapterContent = chapterContent,
+                                quizService = quizService,
+                                onAnswerSelected = { answer ->
+                                    if (answer == currentQuestion!!.correctAnswer) {
+                                        correctAnswersCount++
+                                    }
+                                },
+                                onDismiss = {
+                                    if (currentQuestionIndex < quizQuestions.size - 1) {
+                                        // Move to next question
+                                        currentQuestionIndex++
+                                        currentQuestion = quizQuestions[currentQuestionIndex]
+                                    } else {
+                                        // Quiz complete
+                                        showQuiz = false
+                                        showQuizResults = true
+                                        
+                                        // Save scores to database
+                                        lifecycleScope.launch {
+                                            if (bookId != -1L) {
+                                                quizRepository.saveChapterScore(
+                                                    bookId = bookId,
+                                                    chapterNumber = currentChapter,
+                                                    correctAnswers = correctAnswersCount,
+                                                    totalQuestions = quizQuestions.size,
+                                                    averageDifficulty = quizQuestions.map { it.difficulty }.average()
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    } else {
+                        ReaderScreen(
+                            book = book,
+                            chapterContent = chapterContent,
+                            currentChapter = currentChapter,
+                            totalChapters = totalChapters,
+                            fontSize = fontSize,
+                            onFontSizeChange = { newSize ->
+                                fontSize = newSize
+                            },
+                            onReadAloudClick = { segments ->
+                                readAloudService.readAloud(segments)
+                            },
+                            onPauseClick = {
+                                readAloudService.pause()
+                            },
+                            onStopClick = {
+                                readAloudService.stop()
+                            },
+                            onChapterChange = { newChapter ->
+                                currentChapter = newChapter
+                                lifecycleScope.launch {
+                                    book?.let { loadedBook ->
+                                        val epubData = File(loadedBook.filePath).inputStream().use {
+                                            epubReader.loadEpub(it)
+                                        }
+                                        if (newChapter < epubData.chapters.size) {
+                                            chapterContent = epubData.chapters[newChapter].content
+                                            
+                                             // Check if we should show quiz at chapter end
+                                             // Show quiz every chapter, but with fewer questions
+                                             if (quizService.shouldShowQuiz(chapterContent, newChapter)) {
+                                                // Show loading screen while AI prepares questions
+                                                isPreparingQuiz = true
+                                                
+                                                // Use simple default score for now
+                                                val avgScore = 75
+                                                
+                                                // Generate questions using AI
+                                                quizQuestions = quizService.generateQuestions(
+                                                    chapterContent = chapterContent,
+                                                    chapterNumber = newChapter,
+                                                    previousScore = avgScore
+                                                )
+                                                
+                                                isPreparingQuiz = false
+                                                
+                                                if (quizQuestions.isNotEmpty()) {
+                                                    currentQuestionIndex = 0
+                                                    currentQuestion = quizQuestions[0]
+                                                    correctAnswersCount = 0
+                                                    showQuiz = true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            onShowDashboard = {
+                                showDashboard = true
+                            }
+                        )
+                    }
+                    
+                    // Quiz results dialog
+                    if (showQuizResults) {
+                        QuizResultsDialog(
+                            correctAnswers = correctAnswersCount,
+                            totalQuestions = quizQuestions.size,
+                            onDismiss = {
+                                showQuizResults = false
+                                correctAnswersCount = 0
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        readAloudService.cleanup()
+        textLLMService.cleanup()
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReaderScreen(
+    book: Book?,
+    chapterContent: String,
+    currentChapter: Int,
+    totalChapters: Int,
+    fontSize: Float,
+    onFontSizeChange: (Float) -> Unit,
+    onReadAloudClick: (List<ReadAloudService.ContentSegment>) -> Unit,
+    onPauseClick: () -> Unit,
+    onStopClick: () -> Unit,
+    onChapterChange: (Int) -> Unit,
+    onShowDashboard: () -> Unit
+) {
+    var isReadAloudMode by remember { mutableStateOf(false) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var speechRate by remember { mutableStateOf(1.0f) }
+    
+    // Swipe gesture state
+    var dragOffset by remember { mutableStateOf(0f) }
+    val swipeThreshold = 300f
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { 
+                    Column {
+                        Text(book?.title ?: "Loading...")
+                        if (totalChapters > 0) {
+                            Text(
+                                text = "Chapter ${currentChapter + 1} of $totalChapters",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = { /* Navigate back */ }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onShowDashboard) {
+                        Icon(Icons.Default.Analytics, contentDescription = "Comprehension Dashboard")
+                    }
+                    IconButton(onClick = { isReadAloudMode = !isReadAloudMode }) {
+                        Icon(
+                            if (isReadAloudMode) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                            contentDescription = "Toggle Read Aloud"
+                        )
+                    }
+                }
+            )
+        },
+        bottomBar = {
+            if (isReadAloudMode) {
+                ReadAloudControls(
+                    isPlaying = isPlaying,
+                    speechRate = speechRate,
+                    onPlayPauseClick = {
+                        isPlaying = !isPlaying
+                        if (isPlaying) {
+                            // Create content segments from chapter
+                            val segments = listOf(
+                                ReadAloudService.ContentSegment(
+                                    text = chapterContent,
+                                    position = 0
+                                )
+                            )
+                            onReadAloudClick(segments)
+                        } else {
+                            onPauseClick()
+                        }
+                    },
+                    onStopClick = {
+                        isPlaying = false
+                        onStopClick()
+                    },
+                    onSpeedChange = { newRate ->
+                        speechRate = newRate
+                    }
+                )
+            } else {
+                // Chapter navigation
+                Surface(
+                    tonalElevation = 3.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { 
+                                if (currentChapter > 0) {
+                                    onChapterChange(currentChapter - 1)
+                                }
+                            },
+                            enabled = currentChapter > 0
+                        ) {
+                            Icon(Icons.Default.NavigateBefore, contentDescription = null)
+                            Text("Previous")
+                        }
+                        
+                        Button(
+                            onClick = { 
+                                if (currentChapter < totalChapters - 1) {
+                                    onChapterChange(currentChapter + 1)
+                                }
+                            },
+                            enabled = currentChapter < totalChapters - 1
+                        ) {
+                            Text("Next")
+                            Icon(Icons.Default.NavigateNext, contentDescription = null)
+                        }
+                    }
+                }
+            }
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState())
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (abs(dragOffset) > swipeThreshold) {
+                                if (dragOffset > 0 && currentChapter > 0) {
+                                    // Swipe right - previous chapter
+                                    onChapterChange(currentChapter - 1)
+                                } else if (dragOffset < 0 && currentChapter < totalChapters - 1) {
+                                    // Swipe left - next chapter
+                                    onChapterChange(currentChapter + 1)
+                                }
+                            }
+                            dragOffset = 0f
+                        },
+                        onDragCancel = {
+                            dragOffset = 0f
+                        },
+                        onHorizontalDrag = { _, dragAmount ->
+                            dragOffset += dragAmount
+                        }
+                    )
+                }
+        ) {
+            if (book != null) {
+                HtmlText(
+                    html = chapterContent.ifEmpty { "<p>Loading chapter...</p>" },
+                    fontSize = fontSize,
+                    onFontSizeChange = onFontSizeChange,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(32.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ReadAloudControls(
+    isPlaying: Boolean,
+    speechRate: Float,
+    onPlayPauseClick: () -> Unit,
+    onStopClick: () -> Unit,
+    onSpeedChange: (Float) -> Unit
+) {
+    Surface(
+        tonalElevation = 3.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onStopClick) {
+                    Icon(Icons.Default.Stop, contentDescription = "Stop")
+                }
+                
+                FilledIconButton(
+                    onClick = onPlayPauseClick,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+                
+                Text(
+                    text = "${speechRate}x",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Speed:", modifier = Modifier.padding(end = 8.dp))
+                Slider(
+                    value = speechRate,
+                    onValueChange = onSpeedChange,
+                    valueRange = 0.5f..2.0f,
+                    steps = 5,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}

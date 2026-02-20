@@ -1,0 +1,28 @@
+*.iml
+.gradle
+/local.properties
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+/.idea/libraries
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Android Studio
+*.iml
+.idea/
+.gradle/
+build/
+*/build/
+
+# Model files (can be large)
+app/src/main/assets/models/*.tflite
+
+# Test books
+*.epub
+*.pdf
+*.mobi
