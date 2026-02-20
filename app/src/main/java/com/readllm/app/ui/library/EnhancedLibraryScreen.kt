@@ -53,7 +53,8 @@ fun EnhancedLibraryScreen(
     onBookLongPress: (Book) -> Unit = {},
     onStatusChange: (Book, ReadingStatus) -> Unit = { _, _ -> },
     onFavoriteToggle: (Book) -> Unit = {},
-    onDeleteBook: (Book) -> Unit = {}
+    onDeleteBook: (Book) -> Unit = {},
+    onSettingsClick: () -> Unit = {}
 ) {
     var viewMode by remember { mutableStateOf(ViewMode.LIST) }
     var sortBy by remember { mutableStateOf(SortBy.LAST_READ) }
@@ -131,8 +132,8 @@ fun EnhancedLibraryScreen(
                                 "Toggle view"
                             )
                         }
-                        IconButton(onClick = onScanBooks) {
-                            Icon(Icons.Default.CloudDownload, "Scan device for books")
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(Icons.Default.Settings, "Settings")
                         }
                     }
                 )

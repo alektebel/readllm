@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.readllm.app.database.AppDatabase
+import com.readllm.app.llm.ModelDownloadService
 import com.readllm.app.model.Book
 import com.readllm.app.model.BookFormat
 import com.readllm.app.model.ReadingStatus
@@ -26,6 +27,7 @@ import com.readllm.app.repository.ReadingSettingsRepository
 import com.readllm.app.repository.ReadingSessionRepository
 import com.readllm.app.scanner.BookScanner
 import com.readllm.app.ui.library.EnhancedLibraryScreen
+import com.readllm.app.ui.settings.SettingsScreen
 import com.readllm.app.ui.theme.ReadLLMTheme
 import kotlinx.coroutines.launch
 import java.io.File
@@ -40,6 +42,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var readingSettingsRepository: ReadingSettingsRepository
     private lateinit var readingSessionRepository: ReadingSessionRepository
     private lateinit var bookScanner: BookScanner
+    private lateinit var modelDownloadService: ModelDownloadService
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +55,18 @@ class MainActivity : ComponentActivity() {
         readingSettingsRepository = ReadingSettingsRepository(database.readingSettingsDao())
         readingSessionRepository = ReadingSessionRepository(database.readingSessionDao())
         bookScanner = BookScanner(this)
+        modelDownloadService = ModelDownloadService(this)
+        
+        // Check if model needs to be downloaded
+        lifecycleScope.launch {
+            if (!modelDownloadService.isModelDownloaded()) {
+                // Model will be downloaded in the background
+                modelDownloadService.downloadModel().collect { progress ->
+                    // Log download progress
+                    android.util.Log.d("MainActivity", "Model download: ${progress.status} - ${progress.progress}%")
+                }
+            }
+        }
         
         setContent {
             ReadLLMTheme {
@@ -140,6 +155,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun LibraryScreenWrapper() {
         var books by remember { mutableStateOf<List<Book>>(emptyList()) }
+        var showSettings by remember { mutableStateOf(false) }
         
         // Collect books from repository
         LaunchedEffect(Unit) {
@@ -155,31 +171,43 @@ class MainActivity : ComponentActivity() {
             uri?.let { importEpubFile(it) }
         }
         
-        EnhancedLibraryScreen(
-            books = books,
-            onBookClick = { book ->
-                // Navigate to ReaderActivity
-                startActivity(Intent(this, ReaderActivity::class.java).apply {
-                    putExtra("book_id", book.id)
-                })
-            },
-            onImportBook = {
-                filePickerLauncher.launch(arrayOf("application/epub+zip"))
-            },
-            onScanBooks = {
-                scanDeviceForBooks()
-            },
-            onStatusChange = { book, newStatus ->
-                lifecycleScope.launch {
-                    bookRepository.updateReadingStatus(book.id, newStatus)
+        if (showSettings) {
+            SettingsScreen(onBack = { showSettings = false })
+        } else {
+            EnhancedLibraryScreen(
+                books = books,
+                onBookClick = { book ->
+                    // Navigate to ReaderActivity
+                    startActivity(Intent(this, ReaderActivity::class.java).apply {
+                        putExtra("book_id", book.id)
+                    })
+                },
+                onImportBook = {
+                    filePickerLauncher.launch(arrayOf("application/epub+zip"))
+                },
+                onScanBooks = {
+                    scanDeviceForBooks()
+                },
+                onStatusChange = { book, newStatus ->
+                    lifecycleScope.launch {
+                        bookRepository.updateReadingStatus(book.id, newStatus)
+                    }
+                },
+                onFavoriteToggle = { book ->
+                    lifecycleScope.launch {
+                        bookRepository.updateFavorite(book.id, !book.isFavorite)
+                    }
+                },
+                onDeleteBook = { book ->
+                    lifecycleScope.launch {
+                        bookRepository.deleteBook(book)
+                    }
+                },
+                onSettingsClick = {
+                    showSettings = true
                 }
-            },
-            onFavoriteToggle = { book ->
-                lifecycleScope.launch {
-                    bookRepository.updateFavorite(book.id, !book.isFavorite)
-                }
-            }
-        )
+            )
+        }
     }
     
     private fun importEpubFile(uri: Uri) {
