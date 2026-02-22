@@ -84,7 +84,12 @@ class ReadAloudService(
                         // Clean HTML tags from text before speaking
                         val cleanText = cleanHtmlForSpeech(segment.text)
                         if (cleanText.isNotBlank()) {
-                            speakText(cleanText, i.toString())
+                            // Split text into smaller chunks to avoid TTS limits
+                            // TextToSpeech has a max character limit (typically 4000 chars)
+                            val chunks = splitTextIntoChunks(cleanText, maxChunkSize = 3000)
+                            chunks.forEachIndexed { chunkIndex, chunk ->
+                                speakText(chunk, "${i}_${chunkIndex}")
+                            }
                         }
                     }
                     
@@ -98,6 +103,33 @@ class ReadAloudService(
                 }
             }
         }
+    }
+    
+    /**
+     * Split text into smaller chunks at sentence boundaries to avoid TTS character limits
+     */
+    private fun splitTextIntoChunks(text: String, maxChunkSize: Int): List<String> {
+        if (text.length <= maxChunkSize) {
+            return listOf(text)
+        }
+        
+        val chunks = mutableListOf<String>()
+        val sentences = text.split(Regex("(?<=[.!?])\\s+"))
+        var currentChunk = StringBuilder()
+        
+        for (sentence in sentences) {
+            if (currentChunk.length + sentence.length > maxChunkSize && currentChunk.isNotEmpty()) {
+                chunks.add(currentChunk.toString().trim())
+                currentChunk = StringBuilder()
+            }
+            currentChunk.append(sentence).append(" ")
+        }
+        
+        if (currentChunk.isNotEmpty()) {
+            chunks.add(currentChunk.toString().trim())
+        }
+        
+        return chunks.ifEmpty { listOf(text) }
     }
     
     /**

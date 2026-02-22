@@ -526,7 +526,7 @@ fun SettingsScreen(
                 SettingsSwitch(
                     icon = Icons.Default.Speed,
                     title = "RSVP Speed Reading",
-                    subtitle = "Display words one at a time",
+                    subtitle = "Rapid Serial Visual Presentation - Shows one word at a time for faster reading",
                     checked = enableRSVPMode,
                     onCheckedChange = { scope.launch { appSettings.setEnableRSVPMode(it) } }
                 )

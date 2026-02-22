@@ -353,6 +353,7 @@ fun ReaderScreen(
     val enableReadingRuler by appSettings.enableReadingRuler.collectAsState(initial = false)
     val enableRSVPMode by appSettings.enableRSVPMode.collectAsState(initial = false)
     val enableParagraphMode by appSettings.enableParagraphMode.collectAsState(initial = false)
+    val enableSwipeNavigation by appSettings.enableSwipeNavigation.collectAsState(initial = true)
     
     // Collect book-story inspired features
     val enableBionicReading by appSettings.enableBionicReading.collectAsState(initial = false)
@@ -563,34 +564,42 @@ fun ReaderScreen(
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
             // Main content with theme
+            val scrollState = rememberScrollState()
+            
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState())
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                if (abs(dragOffset) > swipeThreshold) {
-                                    if (dragOffset > 0 && currentChapter > 0) {
-                                        // Swipe right - previous chapter
-                                        onChapterChange(currentChapter - 1)
-                                    } else if (dragOffset < 0 && currentChapter < totalChapters - 1) {
-                                        // Swipe left - next chapter
-                                        onChapterChange(currentChapter + 1)
+                    .verticalScroll(scrollState)
+                    .then(
+                        if (enableSwipeNavigation) {
+                            Modifier.pointerInput(Unit) {
+                                detectHorizontalDragGestures(
+                                    onDragEnd = {
+                                        if (abs(dragOffset) > swipeThreshold) {
+                                            if (dragOffset > 0 && currentChapter > 0) {
+                                                // Swipe right - previous chapter
+                                                onChapterChange(currentChapter - 1)
+                                            } else if (dragOffset < 0 && currentChapter < totalChapters - 1) {
+                                                // Swipe left - next chapter
+                                                onChapterChange(currentChapter + 1)
+                                            }
+                                        }
+                                        dragOffset = 0f
+                                    },
+                                    onDragCancel = {
+                                        dragOffset = 0f
+                                    },
+                                    onHorizontalDrag = { _, dragAmount ->
+                                        dragOffset += dragAmount
                                     }
-                                }
-                                dragOffset = 0f
-                            },
-                            onDragCancel = {
-                                dragOffset = 0f
-                            },
-                            onHorizontalDrag = { _, dragAmount ->
-                                dragOffset += dragAmount
+                                )
                             }
-                        )
-                    }
+                        } else {
+                            Modifier
+                        }
+                    )
             ) {
                 if (book != null) {
                     HtmlText(

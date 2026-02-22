@@ -259,11 +259,29 @@ class EpubReaderService {
     }
     
     private fun extractTitle(html: String): String? {
-        val titleRegex = Regex("<title>([^<]+)</title>", RegexOption.IGNORE_CASE)
+        // Prioritize heading tags (h1-h3) over title tag for better chapter titles
         val h1Regex = Regex("<h1[^>]*>([^<]+)</h1>", RegexOption.IGNORE_CASE)
+        val h2Regex = Regex("<h2[^>]*>([^<]+)</h2>", RegexOption.IGNORE_CASE)
+        val h3Regex = Regex("<h3[^>]*>([^<]+)</h3>", RegexOption.IGNORE_CASE)
+        val titleRegex = Regex("<title>([^<]+)</title>", RegexOption.IGNORE_CASE)
         
+        // Try h1 first (most common for chapter titles)
+        h1Regex.find(html)?.groupValues?.get(1)?.let { 
+            val trimmed = it.trim()
+            // Skip if it looks like a book title (avoid generic titles)
+            if (trimmed.isNotEmpty() && !trimmed.equals("title", ignoreCase = true)) {
+                return trimmed
+            }
+        }
+        
+        // Try h2
+        h2Regex.find(html)?.groupValues?.get(1)?.let { return it.trim() }
+        
+        // Try h3
+        h3Regex.find(html)?.groupValues?.get(1)?.let { return it.trim() }
+        
+        // Fallback to title tag (may be book title, but better than nothing)
         titleRegex.find(html)?.groupValues?.get(1)?.let { return it.trim() }
-        h1Regex.find(html)?.groupValues?.get(1)?.let { return it.trim() }
         
         return null
     }
