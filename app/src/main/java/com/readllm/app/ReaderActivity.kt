@@ -18,9 +18,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.readllm.app.database.AppDatabase
 import com.readllm.app.llm.TextLLMService
 import com.readllm.app.model.Book
+import com.readllm.app.model.ColorPreset
 import com.readllm.app.quiz.ComprehensionDashboard
 import com.readllm.app.quiz.ComprehensionQuizService
 import com.readllm.app.quiz.QuizResultsDialog
@@ -38,6 +40,7 @@ import com.readllm.app.ui.reader.BionicReading
 import com.readllm.app.ui.reader.HorizontalLimiter
 import com.readllm.app.ui.reader.PerceptionExpander
 import com.readllm.app.ui.reader.ChapterNavigationDrawer
+import com.readllm.app.ui.reader.ColorPresetSelector
 import com.readllm.app.ui.settings.AppSettings
 import com.readllm.app.ui.theme.ReadingThemes
 import com.readllm.app.ui.theme.ReadLLMTheme
@@ -100,10 +103,12 @@ class ReaderActivity : ComponentActivity() {
                     var fontSize by remember { mutableStateOf(18f) }
                     var isPreparingQuiz by remember { mutableStateOf(false) }
                     
-                    // Collect AI quiz setting
+                    // Collect settings
                     val context = LocalContext.current
                     val appSettings = remember { AppSettings(context) }
                     val enableAIQuizzes by appSettings.enableAIQuizzes.collectAsState(initial = false)
+                    val colorPresetId by appSettings.colorPresetId.collectAsState(initial = 0)
+                    val enablePureDark by appSettings.enablePureDark.collectAsState(initial = false)
                     
                     LaunchedEffect(bookId) {
                         if (bookId != -1L) {
@@ -361,6 +366,13 @@ fun ReaderScreen(
     val readingThemeName by appSettings.readingTheme.collectAsState(initial = "Default Light")
     val readingTheme = remember(readingThemeName) { ReadingThemes.getThemeByName(readingThemeName) }
     
+    // Collect color preset setting
+    val colorPresetId by appSettings.colorPresetId.collectAsState(initial = 0)
+    val colorPreset = remember(colorPresetId) { ColorPreset.getPresetById(colorPresetId) }
+    
+    // Coroutine scope for settings updates
+    val scope = rememberCoroutineScope()
+    
     var isReadAloudMode by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
     var speechRate by remember { mutableStateOf(1.0f) }
@@ -369,6 +381,7 @@ fun ReaderScreen(
     var showRSVP by remember { mutableStateOf(false) }
     var showParagraphMode by remember { mutableStateOf(false) }
     var showChapterNavigation by remember { mutableStateOf(false) }
+    var showColorPresets by remember { mutableStateOf(false) }
     
     // Swipe gesture state
     var dragOffset by remember { mutableStateOf(0f) }
@@ -383,28 +396,35 @@ fun ReaderScreen(
     
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { 
-                    Column {
-                        Text(book?.title ?: "Loading...")
-                        if (totalChapters > 0) {
-                            Text(
-                                text = "Chapter ${currentChapter + 1} of $totalChapters",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+            Column {
+                TopAppBar(
+                    title = { 
+                        Column {
+                            Text(book?.title ?: "Loading...")
+                            if (totalChapters > 0 && chapters.isNotEmpty()) {
+                                Text(
+                                    text = chapters.getOrNull(currentChapter)?.title ?: "Chapter ${currentChapter + 1}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1
+                                )
+                            }
                         }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { /* Navigate back */ }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    // Chapter navigation button
-                    IconButton(onClick = { showChapterNavigation = true }) {
-                        Icon(Icons.Default.List, contentDescription = "Table of Contents")
-                    }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { /* Navigate back */ }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        // Color preset button
+                        IconButton(onClick = { showColorPresets = true }) {
+                            Icon(Icons.Default.Palette, contentDescription = "Change Colors")
+                        }
+                        
+                        // Chapter navigation button
+                        IconButton(onClick = { showChapterNavigation = true }) {
+                            Icon(Icons.Default.List, contentDescription = "Table of Contents")
+                        }
                     
                     // Reading modes menu
                     var showMenu by remember { mutableStateOf(false) }
@@ -450,6 +470,15 @@ fun ReaderScreen(
                     }
                 }
             )
+            
+            // Chapter progress indicator
+            if (totalChapters > 0) {
+                LinearProgressIndicator(
+                    progress = (currentChapter + 1).toFloat() / totalChapters,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
         },
         floatingActionButton = {
             // Only show FAB when not in read-aloud mode
@@ -571,8 +600,8 @@ fun ReaderScreen(
                         letterSpacing = letterSpacing,
                         paragraphSpacing = paragraphSpacing,
                         textIndent = textIndent,
-                        textColor = readingTheme.textColor,
-                        backgroundColor = readingTheme.backgroundColor,
+                        textColor = colorPreset.textColor,
+                        backgroundColor = colorPreset.backgroundColor,
                         enableBionicReading = enableBionicReading,
                         onFontSizeChange = onFontSizeChange,
                         modifier = Modifier.fillMaxWidth()
@@ -641,6 +670,20 @@ fun ReaderScreen(
                         onChapterChange(chapterIndex)
                     },
                     onDismiss = { showChapterNavigation = false }
+                )
+            }
+            
+            // Color preset selector
+            if (showColorPresets) {
+                ColorPresetSelector(
+                    selectedPresetId = colorPresetId,
+                    onPresetSelected = { preset ->
+                        scope.launch {
+                            appSettings.setColorPresetId(preset.id)
+                        }
+                        showColorPresets = false
+                    },
+                    onDismiss = { showColorPresets = false }
                 )
             }
         }

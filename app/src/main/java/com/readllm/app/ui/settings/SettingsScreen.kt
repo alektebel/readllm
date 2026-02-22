@@ -55,6 +55,12 @@ class AppSettings(private val context: Context) {
         val HORIZONTAL_LIMITER_OFFSET = floatPreferencesKey("horizontal_limiter_offset")
         val ENABLE_PERCEPTION_EXPANDER = booleanPreferencesKey("enable_perception_expander")
         val PERCEPTION_EXPANDER_PADDING = floatPreferencesKey("perception_expander_padding")
+        
+        // Color preset
+        val COLOR_PRESET_ID = intPreferencesKey("color_preset_id")
+        
+        // Pure dark mode
+        val ENABLE_PURE_DARK = booleanPreferencesKey("enable_pure_dark")
     }
     
     // Font size (14-32)
@@ -173,6 +179,16 @@ class AppSettings(private val context: Context) {
     
     val perceptionExpanderPadding: Flow<Float> = context.dataStore.data.map { preferences ->
         preferences[PERCEPTION_EXPANDER_PADDING] ?: 80f
+    }
+    
+    // Color preset ID
+    val colorPresetId: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[COLOR_PRESET_ID] ?: 0  // Default light
+    }
+    
+    // Pure dark mode for AMOLED
+    val enablePureDark: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ENABLE_PURE_DARK] ?: false
     }
     
     // Update functions
@@ -322,7 +338,19 @@ class AppSettings(private val context: Context) {
     
     suspend fun setPerceptionExpanderPadding(padding: Float) {
         context.dataStore.edit { preferences ->
-            preferences[PERCEPTION_EXPANDER_PADDING] = padding.coerceIn(40f, 200f)
+            preferences[PERCEPTION_EXPANDER_PADDING] = padding.coerceIn(0f, 200f)
+        }
+    }
+    
+    suspend fun setColorPresetId(id: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[COLOR_PRESET_ID] = id
+        }
+    }
+    
+    suspend fun setEnablePureDark(enable: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_PURE_DARK] = enable
         }
     }
 }

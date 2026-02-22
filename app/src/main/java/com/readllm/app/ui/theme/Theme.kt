@@ -48,12 +48,39 @@ private val DarkColorScheme = darkColorScheme(
     onSurfaceVariant = Color(0xFFBFC9C8)
 )
 
+// Pure dark mode for AMOLED displays
+private val PureDarkColorScheme = darkColorScheme(
+    primary = Color(0xFF80D4D4),           // Light teal for dark mode
+    onPrimary = Color(0xFF003737),
+    primaryContainer = Color(0xFF002020),  // Darker primary container
+    onPrimaryContainer = Color(0xFFB2EBEB),
+    secondary = Color(0xFFB0CCCC),         // Soft teal-gray
+    onSecondary = Color(0xFF000000),       // Pure black
+    secondaryContainer = Color(0xFF1A1A1A),// Near black
+    onSecondaryContainer = Color(0xFFCCE8E8),
+    tertiary = Color(0xFFB3CAAB),          // Sage green
+    onTertiary = Color(0xFF000000),        // Pure black
+    tertiaryContainer = Color(0xFF1A1A1A), // Near black
+    onTertiaryContainer = Color(0xFFCFE6C6),
+    background = Color(0xFF000000),        // Pure black for AMOLED
+    onBackground = Color(0xFFE0E3E3),
+    surface = Color(0xFF000000),           // Pure black for AMOLED
+    onSurface = Color(0xFFE0E3E3),
+    surfaceVariant = Color(0xFF1A1A1A),    // Near black
+    onSurfaceVariant = Color(0xFFBFC9C8)
+)
+
 @Composable
 fun ReadLLMTheme(
     darkTheme: Boolean = false,
+    pureDark: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = when {
+        darkTheme && pureDark -> PureDarkColorScheme
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,
