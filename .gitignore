@@ -27,3 +27,4 @@ app/src/main/assets/models/*.tflite
 *.pdf
 *.mobi
 readest-repo/
+book-story-repo/

@@ -27,6 +27,7 @@ import com.readllm.app.quiz.QuizResultsDialog
 import com.readllm.app.quiz.QuizScreen
 import com.readllm.app.reader.EpubReaderService
 import com.readllm.app.repository.BookRepository
+import com.readllm.app.repository.BookmarkRepository
 import com.readllm.app.repository.QuizRepository
 import com.readllm.app.tts.ReadAloudService
 import com.readllm.app.ui.HtmlText
@@ -36,6 +37,7 @@ import com.readllm.app.ui.reader.ParagraphModeOverlay
 import com.readllm.app.ui.reader.BionicReading
 import com.readllm.app.ui.reader.HorizontalLimiter
 import com.readllm.app.ui.reader.PerceptionExpander
+import com.readllm.app.ui.reader.ChapterNavigationDrawer
 import com.readllm.app.ui.settings.AppSettings
 import com.readllm.app.ui.theme.ReadingThemes
 import com.readllm.app.ui.theme.ReadLLMTheme
@@ -48,6 +50,7 @@ class ReaderActivity : ComponentActivity() {
     private lateinit var readAloudService: ReadAloudService
     private lateinit var bookRepository: BookRepository
     private lateinit var quizRepository: QuizRepository
+    private lateinit var bookmarkRepository: BookmarkRepository
     private lateinit var epubReader: EpubReaderService
     private lateinit var textLLMService: TextLLMService
     private lateinit var quizService: ComprehensionQuizService
@@ -58,6 +61,7 @@ class ReaderActivity : ComponentActivity() {
         val database = AppDatabase.getDatabase(this)
         bookRepository = BookRepository(database.bookDao())
         quizRepository = QuizRepository(database.chapterScoreDao(), database.quizQuestionDao())
+        bookmarkRepository = BookmarkRepository(database.bookmarkDao())
         epubReader = EpubReaderService()
         
         // Initialize Text LLM Service for quiz generation
@@ -85,6 +89,7 @@ class ReaderActivity : ComponentActivity() {
                     var currentChapter by remember { mutableStateOf(0) }
                     var chapterContent by remember { mutableStateOf("") }
                     var totalChapters by remember { mutableStateOf(0) }
+                    var chapters by remember { mutableStateOf<List<EpubReaderService.Chapter>>(emptyList()) }
                     var showQuiz by remember { mutableStateOf(false) }
                     var currentQuestion by remember { mutableStateOf<ComprehensionQuizService.QuizQuestion?>(null) }
                     var currentQuestionIndex by remember { mutableStateOf(0) }
@@ -104,16 +109,17 @@ class ReaderActivity : ComponentActivity() {
                                         epubReader.loadEpub(it)
                                     }
                                     totalChapters = epubData.chapters.size
+                                    chapters = epubData.chapters
                                     if (epubData.chapters.isNotEmpty()) {
                                         chapterContent = epubData.chapters[0].content
                                     }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
                                     chapterContent = "Error loading book: ${e.message}"
-            }
-        }
-    }
-}
+                                }
+                            }
+                        }
+                    }
 
 /**
  * Loading screen shown while AI prepares comprehension questions
@@ -226,6 +232,7 @@ fun QuizPreparationScreen() {
                             chapterContent = chapterContent,
                             currentChapter = currentChapter,
                             totalChapters = totalChapters,
+                            chapters = chapters,
                             fontSize = fontSize,
                             onFontSizeChange = { newSize ->
                                 fontSize = newSize
@@ -314,6 +321,7 @@ fun ReaderScreen(
     chapterContent: String,
     currentChapter: Int,
     totalChapters: Int,
+    chapters: List<EpubReaderService.Chapter>,
     fontSize: Float,
     onFontSizeChange: (Float) -> Unit,
     onReadAloudClick: (List<ReadAloudService.ContentSegment>) -> Unit,
@@ -356,6 +364,7 @@ fun ReaderScreen(
     // Reading mode states
     var showRSVP by remember { mutableStateOf(false) }
     var showParagraphMode by remember { mutableStateOf(false) }
+    var showChapterNavigation by remember { mutableStateOf(false) }
     
     // Swipe gesture state
     var dragOffset by remember { mutableStateOf(0f) }
@@ -388,6 +397,11 @@ fun ReaderScreen(
                     }
                 },
                 actions = {
+                    // Chapter navigation button
+                    IconButton(onClick = { showChapterNavigation = true }) {
+                        Icon(Icons.Default.List, contentDescription = "Table of Contents")
+                    }
+                    
                     // Reading modes menu
                     var showMenu by remember { mutableStateOf(false) }
                     
@@ -599,6 +613,18 @@ fun ReaderScreen(
                     isActive = true,
                     fontSize = fontSize,
                     onDismiss = { showParagraphMode = false }
+                )
+            }
+            
+            // Chapter navigation drawer
+            if (showChapterNavigation && chapters.isNotEmpty()) {
+                ChapterNavigationDrawer(
+                    chapters = chapters,
+                    currentChapterIndex = currentChapter,
+                    onChapterSelected = { chapterIndex ->
+                        onChapterChange(chapterIndex)
+                    },
+                    onDismiss = { showChapterNavigation = false }
                 )
             }
         }
