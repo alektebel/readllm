@@ -47,6 +47,14 @@ class AppSettings(private val context: Context) {
         val ENABLE_RSVP_MODE = booleanPreferencesKey("enable_rsvp_mode")
         val ENABLE_PARAGRAPH_MODE = booleanPreferencesKey("enable_paragraph_mode")
         val TTS_HIGHLIGHT_SENTENCES = booleanPreferencesKey("tts_highlight_sentences")
+        
+        // New book-story inspired features
+        val ENABLE_BIONIC_READING = booleanPreferencesKey("enable_bionic_reading")
+        val ENABLE_HORIZONTAL_LIMITER = booleanPreferencesKey("enable_horizontal_limiter")
+        val HORIZONTAL_LIMITER_HEIGHT = floatPreferencesKey("horizontal_limiter_height")
+        val HORIZONTAL_LIMITER_OFFSET = floatPreferencesKey("horizontal_limiter_offset")
+        val ENABLE_PERCEPTION_EXPANDER = booleanPreferencesKey("enable_perception_expander")
+        val PERCEPTION_EXPANDER_PADDING = floatPreferencesKey("perception_expander_padding")
     }
     
     // Font size (14-32)
@@ -140,6 +148,31 @@ class AppSettings(private val context: Context) {
     
     val enableParagraphMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[ENABLE_PARAGRAPH_MODE] ?: false
+    }
+    
+    // Book-story inspired features
+    val enableBionicReading: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ENABLE_BIONIC_READING] ?: false
+    }
+    
+    val enableHorizontalLimiter: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ENABLE_HORIZONTAL_LIMITER] ?: false
+    }
+    
+    val horizontalLimiterHeight: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[HORIZONTAL_LIMITER_HEIGHT] ?: 100f
+    }
+    
+    val horizontalLimiterOffset: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[HORIZONTAL_LIMITER_OFFSET] ?: 0f
+    }
+    
+    val enablePerceptionExpander: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ENABLE_PERCEPTION_EXPANDER] ?: false
+    }
+    
+    val perceptionExpanderPadding: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[PERCEPTION_EXPANDER_PADDING] ?: 80f
     }
     
     // Update functions
@@ -256,6 +289,42 @@ class AppSettings(private val context: Context) {
             preferences[ENABLE_PARAGRAPH_MODE] = enable
         }
     }
+    
+    suspend fun setEnableBionicReading(enable: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_BIONIC_READING] = enable
+        }
+    }
+    
+    suspend fun setEnableHorizontalLimiter(enable: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_HORIZONTAL_LIMITER] = enable
+        }
+    }
+    
+    suspend fun setHorizontalLimiterHeight(height: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[HORIZONTAL_LIMITER_HEIGHT] = height.coerceIn(50f, 300f)
+        }
+    }
+    
+    suspend fun setHorizontalLimiterOffset(offset: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[HORIZONTAL_LIMITER_OFFSET] = offset.coerceIn(-200f, 200f)
+        }
+    }
+    
+    suspend fun setEnablePerceptionExpander(enable: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_PERCEPTION_EXPANDER] = enable
+        }
+    }
+    
+    suspend fun setPerceptionExpanderPadding(padding: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[PERCEPTION_EXPANDER_PADDING] = padding.coerceIn(40f, 200f)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -287,6 +356,12 @@ fun SettingsScreen(
     val enableReadingRuler by appSettings.enableReadingRuler.collectAsState(initial = false)
     val enableRSVPMode by appSettings.enableRSVPMode.collectAsState(initial = false)
     val enableParagraphMode by appSettings.enableParagraphMode.collectAsState(initial = false)
+    val enableBionicReading by appSettings.enableBionicReading.collectAsState(initial = false)
+    val enableHorizontalLimiter by appSettings.enableHorizontalLimiter.collectAsState(initial = false)
+    val horizontalLimiterHeight by appSettings.horizontalLimiterHeight.collectAsState(initial = 100f)
+    val horizontalLimiterOffset by appSettings.horizontalLimiterOffset.collectAsState(initial = 0f)
+    val enablePerceptionExpander by appSettings.enablePerceptionExpander.collectAsState(initial = false)
+    val perceptionExpanderPadding by appSettings.perceptionExpanderPadding.collectAsState(initial = 80f)
     
     Scaffold(
         topBar = {
@@ -438,6 +513,80 @@ fun SettingsScreen(
                     checked = enableParagraphMode,
                     onCheckedChange = { scope.launch { appSettings.setEnableParagraphMode(it) } }
                 )
+            }
+            
+            // Reading Speed Enhancement Section
+            SettingsSection(title = "Reading Speed Enhancement") {
+                // Bionic Reading
+                SettingsSwitch(
+                    icon = Icons.Default.TrendingUp,
+                    title = "Bionic Reading",
+                    subtitle = "Bold first half of words for faster reading",
+                    checked = enableBionicReading,
+                    onCheckedChange = { scope.launch { appSettings.setEnableBionicReading(it) } }
+                )
+                
+                Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                
+                // Horizontal Limiter
+                SettingsSwitch(
+                    icon = Icons.Default.CenterFocusStrong,
+                    title = "Focus Zone (Horizontal Limiter)",
+                    subtitle = "Dim text outside reading zone",
+                    checked = enableHorizontalLimiter,
+                    onCheckedChange = { scope.launch { appSettings.setEnableHorizontalLimiter(it) } }
+                )
+                
+                if (enableHorizontalLimiter) {
+                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                    
+                    SettingsSlider(
+                        icon = Icons.Default.Height,
+                        title = "Focus Zone Height",
+                        value = horizontalLimiterHeight,
+                        valueRange = 50f..300f,
+                        steps = 24,
+                        valueLabel = "${horizontalLimiterHeight.toInt()}dp",
+                        onValueChange = { scope.launch { appSettings.setHorizontalLimiterHeight(it) } }
+                    )
+                    
+                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                    
+                    SettingsSlider(
+                        icon = Icons.Default.VerticalAlignCenter,
+                        title = "Focus Zone Offset",
+                        value = horizontalLimiterOffset,
+                        valueRange = -200f..200f,
+                        steps = 39,
+                        valueLabel = "${horizontalLimiterOffset.toInt()}dp",
+                        onValueChange = { scope.launch { appSettings.setHorizontalLimiterOffset(it) } }
+                    )
+                }
+                
+                Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                
+                // Perception Expander
+                SettingsSwitch(
+                    icon = Icons.Default.UnfoldMore,
+                    title = "Perception Expander",
+                    subtitle = "Vertical guide lines for eye tracking",
+                    checked = enablePerceptionExpander,
+                    onCheckedChange = { scope.launch { appSettings.setEnablePerceptionExpander(it) } }
+                )
+                
+                if (enablePerceptionExpander) {
+                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                    
+                    SettingsSlider(
+                        icon = Icons.Default.SpaceBar,
+                        title = "Guide Line Padding",
+                        value = perceptionExpanderPadding,
+                        valueRange = 40f..200f,
+                        steps = 15,
+                        valueLabel = "${perceptionExpanderPadding.toInt()}dp",
+                        onValueChange = { scope.launch { appSettings.setPerceptionExpanderPadding(it) } }
+                    )
+                }
             }
             
             // AI Quiz Settings Section

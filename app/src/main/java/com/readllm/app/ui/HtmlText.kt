@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.readllm.app.ui.reader.BionicReading
 
 /**
  * Composable that renders HTML content as styled text
@@ -34,11 +35,19 @@ fun HtmlText(
     textIndent: Float = 0f,
     textColor: Color? = null,
     backgroundColor: Color? = null,
+    enableBionicReading: Boolean = false,
     onFontSizeChange: ((Float) -> Unit)? = null
 ) {
     val defaultColor = textColor ?: MaterialTheme.colorScheme.onBackground
-    val annotatedString = remember(html, defaultColor) {
+    var annotatedString = remember(html, defaultColor) {
         htmlToAnnotatedString(html, defaultColor)
+    }
+    
+    // Apply bionic reading if enabled
+    if (enableBionicReading) {
+        annotatedString = remember(html, defaultColor, enableBionicReading) {
+            BionicReading.applyBionicReading(html, true, FontWeight.Bold)
+        }
     }
     
     var currentFontSize by remember { mutableStateOf(fontSize) }

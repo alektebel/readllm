@@ -33,6 +33,9 @@ import com.readllm.app.ui.HtmlText
 import com.readllm.app.ui.reader.ReadingRuler
 import com.readllm.app.ui.reader.RSVPOverlay
 import com.readllm.app.ui.reader.ParagraphModeOverlay
+import com.readllm.app.ui.reader.BionicReading
+import com.readllm.app.ui.reader.HorizontalLimiter
+import com.readllm.app.ui.reader.PerceptionExpander
 import com.readllm.app.ui.settings.AppSettings
 import com.readllm.app.ui.theme.ReadingThemes
 import com.readllm.app.ui.theme.ReadLLMTheme
@@ -334,6 +337,14 @@ fun ReaderScreen(
     val enableRSVPMode by appSettings.enableRSVPMode.collectAsState(initial = false)
     val enableParagraphMode by appSettings.enableParagraphMode.collectAsState(initial = false)
     
+    // Collect book-story inspired features
+    val enableBionicReading by appSettings.enableBionicReading.collectAsState(initial = false)
+    val enableHorizontalLimiter by appSettings.enableHorizontalLimiter.collectAsState(initial = false)
+    val horizontalLimiterHeight by appSettings.horizontalLimiterHeight.collectAsState(initial = 100f)
+    val horizontalLimiterOffset by appSettings.horizontalLimiterOffset.collectAsState(initial = 0f)
+    val enablePerceptionExpander by appSettings.enablePerceptionExpander.collectAsState(initial = false)
+    val perceptionExpanderPadding by appSettings.perceptionExpanderPadding.collectAsState(initial = 80f)
+    
     // Collect theme settings
     val readingThemeName by appSettings.readingTheme.collectAsState(initial = "Default Light")
     val readingTheme = remember(readingThemeName) { ReadingThemes.getThemeByName(readingThemeName) }
@@ -532,6 +543,7 @@ fun ReaderScreen(
                         textIndent = textIndent,
                         textColor = readingTheme.textColor,
                         backgroundColor = readingTheme.backgroundColor,
+                        enableBionicReading = enableBionicReading,
                         onFontSizeChange = onFontSizeChange,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -542,6 +554,25 @@ fun ReaderScreen(
                             .padding(32.dp)
                     )
                 }
+            }
+            
+            // Horizontal Limiter (Focus Zone)
+            if (enableHorizontalLimiter && !showRSVP && !showParagraphMode) {
+                HorizontalLimiter(
+                    enabled = true,
+                    zoneHeight = horizontalLimiterHeight.dp,
+                    verticalOffset = horizontalLimiterOffset.dp,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            
+            // Perception Expander (Eye Tracking Guides)
+            if (enablePerceptionExpander && !showRSVP && !showParagraphMode) {
+                PerceptionExpander(
+                    enabled = true,
+                    horizontalPadding = perceptionExpanderPadding.dp,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
             
             // Reading Ruler overlay
