@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.readllm.app.llm.ModelDownloadService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -631,14 +632,8 @@ fun SettingsScreen(
                 if (enableAIQuizzes) {
                     Divider(modifier = Modifier.padding(horizontal = 16.dp))
                     
-                    // Auto Download Model
-                    SettingsSwitch(
-                        icon = Icons.Default.Download,
-                        title = "Auto Download AI Model",
-                        subtitle = "Download model on WiFi (1.5 GB)",
-                        checked = autoDownloadModel,
-                        onCheckedChange = { scope.launch { appSettings.setAutoDownloadModel(it) } }
-                    )
+                    // AI Model Download Manager
+                    AIModelDownloadSection()
                     
                     Divider(modifier = Modifier.padding(horizontal = 16.dp))
                     
@@ -719,6 +714,172 @@ fun SettingsScreen(
             }
             
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+fun AIModelDownloadSection() {
+    val context = LocalContext.current
+    val modelDownloadService = remember { ModelDownloadService(context) }
+    val downloadStatus by modelDownloadService.downloadStatus.collectAsState()
+    val scope = rememberCoroutineScope()
+    
+    var isModelDownloaded by remember { mutableStateOf(modelDownloadService.isModelDownloaded()) }
+    
+    // Update download status when it changes
+    LaunchedEffect(downloadStatus) {
+        if (downloadStatus is ModelDownloadService.DownloadStatus.Success) {
+            isModelDownloaded = true
+        }
+    }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Default.SmartToy,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "AI Model",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = when {
+                        isModelDownloaded -> "Model ready for AI quizzes"
+                        downloadStatus is ModelDownloadService.DownloadStatus.Downloading -> {
+                            val status = downloadStatus as ModelDownloadService.DownloadStatus.Downloading
+                            "Downloading: ${"%.1f".format(status.downloadedMB)} / ${"%.1f".format(status.totalMB)} MB"
+                        }
+                        downloadStatus is ModelDownloadService.DownloadStatus.Error -> {
+                            val error = downloadStatus as ModelDownloadService.DownloadStatus.Error
+                            "Error: ${error.message}"
+                        }
+                        else -> "Required for AI-generated questions (~1.5 GB)"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        // Download progress bar
+        if (downloadStatus is ModelDownloadService.DownloadStatus.Downloading) {
+            val status = downloadStatus as ModelDownloadService.DownloadStatus.Downloading
+            LinearProgressIndicator(
+                progress = status.progress,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            )
+        }
+        
+        // Action buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            when {
+                isModelDownloaded -> {
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                if (modelDownloadService.deleteModel()) {
+                                    isModelDownloaded = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Delete Model")
+                    }
+                }
+                downloadStatus is ModelDownloadService.DownloadStatus.Downloading -> {
+                    OutlinedButton(
+                        onClick = { modelDownloadService.cancelDownload() },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Cancel,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Cancel")
+                    }
+                }
+                else -> {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                modelDownloadService.downloadModel(useSmallModel = false)
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = downloadStatus !is ModelDownloadService.DownloadStatus.Downloading
+                    ) {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Download Model")
+                    }
+                }
+            }
+        }
+        
+        // Info card
+        if (!isModelDownloaded && downloadStatus !is ModelDownloadService.DownloadStatus.Downloading) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Without the model, quizzes use generic questions. Download for AI-generated contextual questions.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
         }
     }
 }

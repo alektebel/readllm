@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 /**
  * Text LLM Service for generating comprehension questions and evaluating answers
@@ -57,13 +58,28 @@ class TextLLMService(private val context: Context) {
     /**
      * Initialize the LLM model
      * Call this once at app startup or before first use
+     * 
+     * Checks for model in two locations:
+     * 1. Downloaded to filesDir (from in-app download)
+     * 2. Bundled in assets folder (if manually added)
      */
     suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
         if (isInitialized) return@withContext true
         
         try {
+            // First check if model was downloaded to filesDir
+            val downloadedModel = File(context.filesDir, MODEL_PATH)
+            val modelPath = if (downloadedModel.exists()) {
+                android.util.Log.d("TextLLMService", "Using downloaded model from: ${downloadedModel.absolutePath}")
+                downloadedModel.absolutePath
+            } else {
+                // Fall back to assets folder
+                android.util.Log.d("TextLLMService", "Attempting to use model from assets: $MODEL_PATH")
+                MODEL_PATH
+            }
+            
             val options = LlmInference.LlmInferenceOptions.builder()
-                .setModelPath(MODEL_PATH)
+                .setModelPath(modelPath)
                 .setMaxTokens(MAX_TOKENS)
                 .setTemperature(TEMPERATURE)
                 .setTopK(TOP_K)
@@ -71,6 +87,7 @@ class TextLLMService(private val context: Context) {
             
             llmInference = LlmInference.createFromOptions(context, options)
             isInitialized = true
+            android.util.Log.d("TextLLMService", "LLM initialized successfully")
             true
         } catch (e: Exception) {
             android.util.Log.e("TextLLMService", "Failed to initialize LLM: ${e.message}", e)

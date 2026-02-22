@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.readllm.app.database.AppDatabase
-import com.readllm.app.llm.ModelDownloadService
 import com.readllm.app.model.Book
 import com.readllm.app.model.BookFormat
 import com.readllm.app.model.ReadingStatus
@@ -42,7 +41,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var readingSettingsRepository: ReadingSettingsRepository
     private lateinit var readingSessionRepository: ReadingSessionRepository
     private lateinit var bookScanner: BookScanner
-    private lateinit var modelDownloadService: ModelDownloadService
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,18 +53,6 @@ class MainActivity : ComponentActivity() {
         readingSettingsRepository = ReadingSettingsRepository(database.readingSettingsDao())
         readingSessionRepository = ReadingSessionRepository(database.readingSessionDao())
         bookScanner = BookScanner(this)
-        modelDownloadService = ModelDownloadService(this)
-        
-        // Check if model needs to be downloaded
-        lifecycleScope.launch {
-            if (!modelDownloadService.isModelDownloaded()) {
-                // Model will be downloaded in the background
-                modelDownloadService.downloadModel().collect { progress ->
-                    // Log download progress
-                    android.util.Log.d("MainActivity", "Model download: ${progress.status} - ${progress.progress}%")
-                }
-            }
-        }
         
         setContent {
             ReadLLMTheme {
