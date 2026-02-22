@@ -2,6 +2,7 @@ package com.readllm.app.ui
 
 import android.text.Html
 import android.text.Spanned
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicText
@@ -16,6 +17,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
@@ -26,11 +28,17 @@ fun HtmlText(
     html: String,
     modifier: Modifier = Modifier,
     fontSize: Float = 18f,
+    lineHeight: Float = 1.5f,
+    letterSpacing: Float = 0f,
+    paragraphSpacing: Float = 16f,
+    textIndent: Float = 0f,
+    textColor: Color? = null,
+    backgroundColor: Color? = null,
     onFontSizeChange: ((Float) -> Unit)? = null
 ) {
-    val color = MaterialTheme.colorScheme.onBackground
-    val annotatedString = remember(html, color) {
-        htmlToAnnotatedString(html, color)
+    val defaultColor = textColor ?: MaterialTheme.colorScheme.onBackground
+    val annotatedString = remember(html, defaultColor) {
+        htmlToAnnotatedString(html, defaultColor)
     }
     
     var currentFontSize by remember { mutableStateOf(fontSize) }
@@ -48,13 +56,21 @@ fun HtmlText(
         }
     }
     
+    // Apply background color if specified
+    val finalModifier = if (backgroundColor != null) {
+        pointerModifier.background(backgroundColor)
+    } else {
+        pointerModifier
+    }
+    
     BasicText(
         text = annotatedString,
-        modifier = pointerModifier,
+        modifier = finalModifier.padding(start = textIndent.dp),
         style = TextStyle(
             fontSize = currentFontSize.sp,
-            lineHeight = (currentFontSize * 1.5f).sp,
-            color = color,
+            lineHeight = (currentFontSize * lineHeight).sp,
+            letterSpacing = letterSpacing.sp,
+            color = defaultColor,
             fontFamily = FontFamily.Serif
         )
     )

@@ -29,20 +29,49 @@ class AppSettings(private val context: Context) {
     
     companion object {
         val FONT_SIZE = floatPreferencesKey("font_size")
+        val LINE_HEIGHT = floatPreferencesKey("line_height")
+        val LETTER_SPACING = floatPreferencesKey("letter_spacing")
+        val PARAGRAPH_SPACING = floatPreferencesKey("paragraph_spacing")
+        val TEXT_INDENT = floatPreferencesKey("text_indent")
         val ENABLE_AI_QUIZZES = booleanPreferencesKey("enable_ai_quizzes")
         val AUTO_DOWNLOAD_MODEL = booleanPreferencesKey("auto_download_model")
         val SPEECH_RATE = floatPreferencesKey("speech_rate")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val READING_THEME = stringPreferencesKey("reading_theme")
         val QUIZ_DIFFICULTY = intPreferencesKey("quiz_difficulty")
         val QUESTIONS_PER_CHAPTER = intPreferencesKey("questions_per_chapter")
         val ENABLE_SWIPE_NAVIGATION = booleanPreferencesKey("enable_swipe_navigation")
         val PAGE_TURN_ANIMATION = booleanPreferencesKey("page_turn_animation")
         val AUTO_SAVE_PROGRESS = booleanPreferencesKey("auto_save_progress")
+        val ENABLE_READING_RULER = booleanPreferencesKey("enable_reading_ruler")
+        val ENABLE_RSVP_MODE = booleanPreferencesKey("enable_rsvp_mode")
+        val ENABLE_PARAGRAPH_MODE = booleanPreferencesKey("enable_paragraph_mode")
+        val TTS_HIGHLIGHT_SENTENCES = booleanPreferencesKey("tts_highlight_sentences")
     }
     
     // Font size (14-32)
     val fontSize: Flow<Float> = context.dataStore.data.map { preferences ->
         preferences[FONT_SIZE] ?: 18f
+    }
+    
+    // Line height multiplier (1.0 - 2.5)
+    val lineHeight: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[LINE_HEIGHT] ?: 1.5f
+    }
+    
+    // Letter spacing (-0.05 - 0.3)
+    val letterSpacing: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[LETTER_SPACING] ?: 0f
+    }
+    
+    // Paragraph spacing (0 - 32)
+    val paragraphSpacing: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[PARAGRAPH_SPACING] ?: 16f
+    }
+    
+    // Text indent (0 - 48)
+    val textIndent: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[TEXT_INDENT] ?: 0f
     }
     
     // Enable AI quizzes
@@ -60,9 +89,19 @@ class AppSettings(private val context: Context) {
         preferences[SPEECH_RATE] ?: 1.0f
     }
     
+    // TTS highlight sentences
+    val ttsHighlightSentences: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[TTS_HIGHLIGHT_SENTENCES] ?: false
+    }
+    
     // Theme mode (light, dark, system)
     val themeMode: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[THEME_MODE] ?: "system"
+    }
+    
+    // Reading theme name
+    val readingTheme: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[READING_THEME] ?: "Default Light"
     }
     
     // Quiz difficulty (1-5)
@@ -90,10 +129,47 @@ class AppSettings(private val context: Context) {
         preferences[AUTO_SAVE_PROGRESS] ?: true
     }
     
+    // Reading modes
+    val enableReadingRuler: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ENABLE_READING_RULER] ?: false
+    }
+    
+    val enableRSVPMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ENABLE_RSVP_MODE] ?: false
+    }
+    
+    val enableParagraphMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ENABLE_PARAGRAPH_MODE] ?: false
+    }
+    
     // Update functions
     suspend fun setFontSize(size: Float) {
         context.dataStore.edit { preferences ->
             preferences[FONT_SIZE] = size.coerceIn(14f, 32f)
+        }
+    }
+    
+    suspend fun setLineHeight(height: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[LINE_HEIGHT] = height.coerceIn(1.0f, 2.5f)
+        }
+    }
+    
+    suspend fun setLetterSpacing(spacing: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[LETTER_SPACING] = spacing.coerceIn(-0.05f, 0.3f)
+        }
+    }
+    
+    suspend fun setParagraphSpacing(spacing: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[PARAGRAPH_SPACING] = spacing.coerceIn(0f, 32f)
+        }
+    }
+    
+    suspend fun setTextIndent(indent: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[TEXT_INDENT] = indent.coerceIn(0f, 48f)
         }
     }
     
@@ -115,9 +191,21 @@ class AppSettings(private val context: Context) {
         }
     }
     
+    suspend fun setTTSHighlightSentences(enable: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[TTS_HIGHLIGHT_SENTENCES] = enable
+        }
+    }
+    
     suspend fun setThemeMode(mode: String) {
         context.dataStore.edit { preferences ->
             preferences[THEME_MODE] = mode
+        }
+    }
+    
+    suspend fun setReadingTheme(theme: String) {
+        context.dataStore.edit { preferences ->
+            preferences[READING_THEME] = theme
         }
     }
     
@@ -150,6 +238,24 @@ class AppSettings(private val context: Context) {
             preferences[AUTO_SAVE_PROGRESS] = enable
         }
     }
+    
+    suspend fun setEnableReadingRuler(enable: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_READING_RULER] = enable
+        }
+    }
+    
+    suspend fun setEnableRSVPMode(enable: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_RSVP_MODE] = enable
+        }
+    }
+    
+    suspend fun setEnableParagraphMode(enable: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_PARAGRAPH_MODE] = enable
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -163,15 +269,24 @@ fun SettingsScreen(
     
     // Collect settings
     val fontSize by appSettings.fontSize.collectAsState(initial = 18f)
+    val lineHeight by appSettings.lineHeight.collectAsState(initial = 1.5f)
+    val letterSpacing by appSettings.letterSpacing.collectAsState(initial = 0f)
+    val paragraphSpacing by appSettings.paragraphSpacing.collectAsState(initial = 16f)
+    val textIndent by appSettings.textIndent.collectAsState(initial = 0f)
     val enableAIQuizzes by appSettings.enableAIQuizzes.collectAsState(initial = true)
     val autoDownloadModel by appSettings.autoDownloadModel.collectAsState(initial = false)
     val speechRate by appSettings.speechRate.collectAsState(initial = 1.0f)
+    val ttsHighlightSentences by appSettings.ttsHighlightSentences.collectAsState(initial = false)
     val themeMode by appSettings.themeMode.collectAsState(initial = "system")
+    val readingTheme by appSettings.readingTheme.collectAsState(initial = "Default Light")
     val quizDifficulty by appSettings.quizDifficulty.collectAsState(initial = 3)
     val questionsPerChapter by appSettings.questionsPerChapter.collectAsState(initial = 1)
     val enableSwipeNavigation by appSettings.enableSwipeNavigation.collectAsState(initial = true)
     val pageTurnAnimation by appSettings.pageTurnAnimation.collectAsState(initial = true)
     val autoSaveProgress by appSettings.autoSaveProgress.collectAsState(initial = true)
+    val enableReadingRuler by appSettings.enableReadingRuler.collectAsState(initial = false)
+    val enableRSVPMode by appSettings.enableRSVPMode.collectAsState(initial = false)
+    val enableParagraphMode by appSettings.enableParagraphMode.collectAsState(initial = false)
     
     Scaffold(
         topBar = {
@@ -235,6 +350,93 @@ fun SettingsScreen(
                     subtitle = "Automatically bookmark your position",
                     checked = autoSaveProgress,
                     onCheckedChange = { scope.launch { appSettings.setAutoSaveProgress(it) } }
+                )
+            }
+            
+            // Typography Settings Section
+            SettingsSection(title = "Typography") {
+                // Line Height
+                SettingsSlider(
+                    icon = Icons.Default.LineWeight,
+                    title = "Line Height",
+                    value = lineHeight,
+                    valueRange = 1.0f..2.5f,
+                    steps = 14,
+                    valueLabel = String.format("%.1fx", lineHeight),
+                    onValueChange = { scope.launch { appSettings.setLineHeight(it) } }
+                )
+                
+                Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                
+                // Letter Spacing
+                SettingsSlider(
+                    icon = Icons.Default.SpaceBar,
+                    title = "Letter Spacing",
+                    value = letterSpacing,
+                    valueRange = -0.05f..0.3f,
+                    steps = 6,
+                    valueLabel = String.format("%.2f", letterSpacing),
+                    onValueChange = { scope.launch { appSettings.setLetterSpacing(it) } }
+                )
+                
+                Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                
+                // Paragraph Spacing
+                SettingsSlider(
+                    icon = Icons.Default.FormatLineSpacing,
+                    title = "Paragraph Spacing",
+                    value = paragraphSpacing,
+                    valueRange = 0f..32f,
+                    steps = 15,
+                    valueLabel = "${paragraphSpacing.toInt()}dp",
+                    onValueChange = { scope.launch { appSettings.setParagraphSpacing(it) } }
+                )
+                
+                Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                
+                // Text Indent
+                SettingsSlider(
+                    icon = Icons.Default.FormatIndentIncrease,
+                    title = "Text Indent",
+                    value = textIndent,
+                    valueRange = 0f..48f,
+                    steps = 11,
+                    valueLabel = "${textIndent.toInt()}dp",
+                    onValueChange = { scope.launch { appSettings.setTextIndent(it) } }
+                )
+            }
+            
+            // Reading Modes Section
+            SettingsSection(title = "Reading Modes") {
+                // Reading Ruler
+                SettingsSwitch(
+                    icon = Icons.Default.HorizontalRule,
+                    title = "Reading Ruler",
+                    subtitle = "Visual line to track reading position",
+                    checked = enableReadingRuler,
+                    onCheckedChange = { scope.launch { appSettings.setEnableReadingRuler(it) } }
+                )
+                
+                Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                
+                // RSVP Mode
+                SettingsSwitch(
+                    icon = Icons.Default.Speed,
+                    title = "RSVP Speed Reading",
+                    subtitle = "Display words one at a time",
+                    checked = enableRSVPMode,
+                    onCheckedChange = { scope.launch { appSettings.setEnableRSVPMode(it) } }
+                )
+                
+                Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                
+                // Paragraph Mode
+                SettingsSwitch(
+                    icon = Icons.Default.FormatAlignLeft,
+                    title = "Paragraph Focus Mode",
+                    subtitle = "Focus on one paragraph at a time",
+                    checked = enableParagraphMode,
+                    onCheckedChange = { scope.launch { appSettings.setEnableParagraphMode(it) } }
                 )
             }
             
@@ -307,6 +509,16 @@ fun SettingsScreen(
                     valueLabel = String.format("%.1fx", speechRate),
                     onValueChange = { scope.launch { appSettings.setSpeechRate(it) } }
                 )
+                
+                Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                
+                SettingsSwitch(
+                    icon = Icons.Default.Highlight,
+                    title = "Highlight Sentences",
+                    subtitle = "Highlight each sentence as it's read",
+                    checked = ttsHighlightSentences,
+                    onCheckedChange = { scope.launch { appSettings.setTTSHighlightSentences(it) } }
+                )
             }
             
             // Appearance Settings
@@ -317,6 +529,15 @@ fun SettingsScreen(
                     options = listOf("Light" to "light", "Dark" to "dark", "System" to "system"),
                     selectedValue = themeMode,
                     onValueChange = { scope.launch { appSettings.setThemeMode(it) } }
+                )
+                
+                Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                
+                // Reading Theme Selector
+                Text(
+                    text = "Reading Theme: $readingTheme",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(16.dp)
                 )
             }
             

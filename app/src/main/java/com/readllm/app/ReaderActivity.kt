@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.lifecycleScope
@@ -29,6 +30,11 @@ import com.readllm.app.repository.BookRepository
 import com.readllm.app.repository.QuizRepository
 import com.readllm.app.tts.ReadAloudService
 import com.readllm.app.ui.HtmlText
+import com.readllm.app.ui.reader.ReadingRuler
+import com.readllm.app.ui.reader.RSVPOverlay
+import com.readllm.app.ui.reader.ParagraphModeOverlay
+import com.readllm.app.ui.settings.AppSettings
+import com.readllm.app.ui.theme.ReadingThemes
 import com.readllm.app.ui.theme.ReadLLMTheme
 import kotlinx.coroutines.launch
 import java.io.File
@@ -313,13 +319,43 @@ fun ReaderScreen(
     onChapterChange: (Int) -> Unit,
     onShowDashboard: () -> Unit
 ) {
+    // Get app settings
+    val context = LocalContext.current
+    val appSettings = remember { AppSettings(context) }
+    
+    // Collect typography settings
+    val lineHeight by appSettings.lineHeight.collectAsState(initial = 1.5f)
+    val letterSpacing by appSettings.letterSpacing.collectAsState(initial = 0f)
+    val paragraphSpacing by appSettings.paragraphSpacing.collectAsState(initial = 16f)
+    val textIndent by appSettings.textIndent.collectAsState(initial = 0f)
+    
+    // Collect reading mode settings
+    val enableReadingRuler by appSettings.enableReadingRuler.collectAsState(initial = false)
+    val enableRSVPMode by appSettings.enableRSVPMode.collectAsState(initial = false)
+    val enableParagraphMode by appSettings.enableParagraphMode.collectAsState(initial = false)
+    
+    // Collect theme settings
+    val readingThemeName by appSettings.readingTheme.collectAsState(initial = "Default Light")
+    val readingTheme = remember(readingThemeName) { ReadingThemes.getThemeByName(readingThemeName) }
+    
     var isReadAloudMode by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
     var speechRate by remember { mutableStateOf(1.0f) }
     
+    // Reading mode states
+    var showRSVP by remember { mutableStateOf(false) }
+    var showParagraphMode by remember { mutableStateOf(false) }
+    
     // Swipe gesture state
     var dragOffset by remember { mutableStateOf(0f) }
     val swipeThreshold = 300f
+    
+    // Convert HTML to AnnotatedString for paragraph mode
+    val annotatedText = remember(chapterContent) {
+        androidx.compose.ui.text.buildAnnotatedString {
+            append(chapterContent)
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -341,6 +377,39 @@ fun ReaderScreen(
                     }
                 },
                 actions = {
+                    // Reading modes menu
+                    var showMenu by remember { mutableStateOf(false) }
+                    
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Reading Modes")
+                    }
+                    
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        if (enableRSVPMode) {
+                            DropdownMenuItem(
+                                text = { Text("RSVP Speed Reading") },
+                                onClick = {
+                                    showRSVP = true
+                                    showMenu = false
+                                },
+                                leadingIcon = { Icon(Icons.Default.Speed, null) }
+                            )
+                        }
+                        if (enableParagraphMode) {
+                            DropdownMenuItem(
+                                text = { Text("Paragraph Focus Mode") },
+                                onClick = {
+                                    showParagraphMode = true
+                                    showMenu = false
+                                },
+                                leadingIcon = { Icon(Icons.Default.FormatAlignLeft, null) }
+                            )
+                        }
+                    }
+                    
                     IconButton(onClick = onShowDashboard) {
                         Icon(Icons.Default.Analytics, contentDescription = "Comprehension Dashboard")
                     }
@@ -422,47 +491,83 @@ fun ReaderScreen(
             }
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState())
-                .pointerInput(Unit) {
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            if (abs(dragOffset) > swipeThreshold) {
-                                if (dragOffset > 0 && currentChapter > 0) {
-                                    // Swipe right - previous chapter
-                                    onChapterChange(currentChapter - 1)
-                                } else if (dragOffset < 0 && currentChapter < totalChapters - 1) {
-                                    // Swipe left - next chapter
-                                    onChapterChange(currentChapter + 1)
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Main content with theme
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                if (abs(dragOffset) > swipeThreshold) {
+                                    if (dragOffset > 0 && currentChapter > 0) {
+                                        // Swipe right - previous chapter
+                                        onChapterChange(currentChapter - 1)
+                                    } else if (dragOffset < 0 && currentChapter < totalChapters - 1) {
+                                        // Swipe left - next chapter
+                                        onChapterChange(currentChapter + 1)
+                                    }
                                 }
+                                dragOffset = 0f
+                            },
+                            onDragCancel = {
+                                dragOffset = 0f
+                            },
+                            onHorizontalDrag = { _, dragAmount ->
+                                dragOffset += dragAmount
                             }
-                            dragOffset = 0f
-                        },
-                        onDragCancel = {
-                            dragOffset = 0f
-                        },
-                        onHorizontalDrag = { _, dragAmount ->
-                            dragOffset += dragAmount
-                        }
+                        )
+                    }
+            ) {
+                if (book != null) {
+                    HtmlText(
+                        html = chapterContent.ifEmpty { "<p>Loading chapter...</p>" },
+                        fontSize = fontSize,
+                        lineHeight = lineHeight,
+                        letterSpacing = letterSpacing,
+                        paragraphSpacing = paragraphSpacing,
+                        textIndent = textIndent,
+                        textColor = readingTheme.textColor,
+                        backgroundColor = readingTheme.backgroundColor,
+                        onFontSizeChange = onFontSizeChange,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(32.dp)
                     )
                 }
-        ) {
-            if (book != null) {
-                HtmlText(
-                    html = chapterContent.ifEmpty { "<p>Loading chapter...</p>" },
-                    fontSize = fontSize,
-                    onFontSizeChange = onFontSizeChange,
-                    modifier = Modifier.fillMaxWidth()
+            }
+            
+            // Reading Ruler overlay
+            if (enableReadingRuler && !showRSVP && !showParagraphMode) {
+                ReadingRuler(
+                    enabled = true,
+                    modifier = Modifier.fillMaxSize()
                 )
-            } else {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .padding(32.dp)
+            }
+            
+            // RSVP overlay
+            if (showRSVP) {
+                RSVPOverlay(
+                    text = chapterContent,
+                    isActive = true,
+                    onDismiss = { showRSVP = false }
+                )
+            }
+            
+            // Paragraph mode overlay
+            if (showParagraphMode) {
+                ParagraphModeOverlay(
+                    text = annotatedText,
+                    isActive = true,
+                    fontSize = fontSize,
+                    onDismiss = { showParagraphMode = false }
                 )
             }
         }
