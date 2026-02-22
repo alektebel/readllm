@@ -84,7 +84,7 @@ class AppSettings(private val context: Context) {
     
     // Enable AI quizzes
     val enableAIQuizzes: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[ENABLE_AI_QUIZZES] ?: true
+        preferences[ENABLE_AI_QUIZZES] ?: false
     }
     
     // Auto download model
@@ -342,7 +342,7 @@ fun SettingsScreen(
     val letterSpacing by appSettings.letterSpacing.collectAsState(initial = 0f)
     val paragraphSpacing by appSettings.paragraphSpacing.collectAsState(initial = 16f)
     val textIndent by appSettings.textIndent.collectAsState(initial = 0f)
-    val enableAIQuizzes by appSettings.enableAIQuizzes.collectAsState(initial = true)
+    val enableAIQuizzes by appSettings.enableAIQuizzes.collectAsState(initial = false)
     val autoDownloadModel by appSettings.autoDownloadModel.collectAsState(initial = false)
     val speechRate by appSettings.speechRate.collectAsState(initial = 1.0f)
     val ttsHighlightSentences by appSettings.ttsHighlightSentences.collectAsState(initial = false)

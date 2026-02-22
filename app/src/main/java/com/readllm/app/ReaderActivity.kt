@@ -100,6 +100,11 @@ class ReaderActivity : ComponentActivity() {
                     var fontSize by remember { mutableStateOf(18f) }
                     var isPreparingQuiz by remember { mutableStateOf(false) }
                     
+                    // Collect AI quiz setting
+                    val context = LocalContext.current
+                    val appSettings = remember { AppSettings(context) }
+                    val enableAIQuizzes by appSettings.enableAIQuizzes.collectAsState(initial = false)
+                    
                     LaunchedEffect(bookId) {
                         if (bookId != -1L) {
                             book = bookRepository.getBookById(bookId)
@@ -256,9 +261,8 @@ fun QuizPreparationScreen() {
                                         if (newChapter < epubData.chapters.size) {
                                             chapterContent = epubData.chapters[newChapter].content
                                             
-                                             // Check if we should show quiz at chapter end
-                                             // Show quiz every chapter, but with fewer questions
-                                             if (quizService.shouldShowQuiz(chapterContent, newChapter)) {
+                                             // Check if we should show quiz at chapter end (only if enabled)
+                                             if (enableAIQuizzes && quizService.shouldShowQuiz(chapterContent, newChapter)) {
                                                 // Show loading screen while AI prepares questions
                                                 isPreparingQuiz = true
                                                 
@@ -446,6 +450,18 @@ fun ReaderScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            // Only show FAB when not in read-aloud mode
+            if (!isReadAloudMode && totalChapters > 0) {
+                FloatingActionButton(
+                    onClick = { showChapterNavigation = true },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Icon(Icons.Default.MenuBook, contentDescription = "Table of Contents")
+                }
+            }
         },
         bottomBar = {
             if (isReadAloudMode) {
