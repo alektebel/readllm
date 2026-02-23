@@ -1,5 +1,6 @@
 package com.readllm.app.ui.library
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -56,7 +57,7 @@ fun EnhancedLibraryScreen(
     onDeleteBook: (Book) -> Unit = {},
     onSettingsClick: () -> Unit = {}
 ) {
-    var viewMode by remember { mutableStateOf(ViewMode.LIST) }
+    var viewMode by remember { mutableStateOf(ViewMode.GRID) }  // Default to grid view like ReadEra
     var sortBy by remember { mutableStateOf(SortBy.LAST_READ) }
     var filter by remember { mutableStateOf(LibraryFilter()) }
     var showFilterDialog by remember { mutableStateOf(false) }
@@ -332,11 +333,11 @@ fun BookGridView(
     modifier: Modifier = Modifier
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 160.dp),
+        columns = GridCells.Adaptive(minSize = 140.dp),  // Slightly smaller for more covers
         modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)  // More vertical spacing
     ) {
         items(books, key = { it.id }) { book ->
             BookGridItem(
@@ -357,77 +358,116 @@ fun BookGridItem(
 ) {
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(0.65f),  // Taller card to emphasize cover
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp)
-        ) {
-            // Book cover placeholder
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.7f),
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                if (book.coverImagePath != null && File(book.coverImagePath).exists()) {
-                    AsyncImage(
-                        model = File(book.coverImagePath),
-                        contentDescription = "Book cover",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Book cover - takes full card
+            if (book.coverImagePath != null && File(book.coverImagePath).exists()) {
+                AsyncImage(
+                    model = File(book.coverImagePath),
+                    contentDescription = "Book cover",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                // Placeholder with larger icon
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                         Icon(
                             Icons.Default.Book,
                             contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
                         )
                     }
                 }
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = book.title,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+            // Gradient overlay at bottom for text readability
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.35f)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(
+                                androidx.compose.ui.graphics.Color.Transparent,
+                                androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.8f)
+                            )
+                        )
+                    )
             )
             
-            Text(
-                text = book.author,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            if (book.readingProgress > 0) {
-                Spacer(modifier = Modifier.height(4.dp))
-                LinearProgressIndicator(
-                    progress = book.readingProgress / 100f,
-                    modifier = Modifier.fillMaxWidth()
+            // Text info at bottom
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomStart)
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = book.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = androidx.compose.ui.graphics.Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                )
+                
+                Spacer(modifier = Modifier.height(2.dp))
+                
+                Text(
+                    text = book.author,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.9f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             
-            Row(
-                modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Status badge at top right
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
             ) {
-                StatusChip(status = book.readingStatus, compact = true)
-                
-                if (book.isFavorite) {
-                    Icon(
-                        Icons.Default.Favorite,
-                        contentDescription = "Favorite",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                if (book.readingProgress > 0) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = "${book.readingProgress.toInt()}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+                    }
                 }
+            }
+            
+            // Favorite indicator at top left
+            if (book.isFavorite) {
+                Icon(
+                    Icons.Default.Favorite,
+                    contentDescription = "Favorite",
+                    modifier = Modifier
+                        .padding(6.dp)
+                        .size(20.dp)
+                        .align(Alignment.TopStart),
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

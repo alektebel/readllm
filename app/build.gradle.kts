@@ -16,6 +16,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // AppAuth redirect scheme
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.readllm.app"
     }
 
     buildTypes {
@@ -111,6 +114,15 @@ dependencies {
     
     // HTML rendering for EPUB
     implementation("androidx.compose.ui:ui-text-google-fonts:1.5.4")
+    
+    // Networking for GitHub API
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    
+    // OAuth for GitHub authentication
+    implementation("net.openid:appauth:0.11.1")
     
     // Testing
     testImplementation("junit:junit:4.13.2")

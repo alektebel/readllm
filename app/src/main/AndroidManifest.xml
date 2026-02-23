@@ -35,6 +35,16 @@
                 <data android:mimeType="application/epub+zip" />
                 <data android:pathPattern=".*\\.epub" />
             </intent-filter>
+            
+            <!-- GitHub OAuth callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="com.readllm.app"
+                    android:host="oauth" />
+            </intent-filter>
         </activity>
         
         <activity

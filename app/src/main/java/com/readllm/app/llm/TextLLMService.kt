@@ -11,23 +11,22 @@ import java.io.File
 /**
  * Text LLM Service for generating comprehension questions and evaluating answers
  * 
- * Uses MediaPipe LLM Inference API with Gemma 2B-IT (instruction-tuned) model
- * for on-device natural language understanding and generation.
+ * Primary method: GitHub Models API (requires GitHub OAuth)
+ * - Access to GPT-4o-mini, Llama 3, Phi-3, etc.
+ * - No model download needed
+ * - Better quality questions and evaluation
+ * - Free tier available
  * 
- * Model Requirements:
- * - Download Gemma 2B-IT model (GPU int4 quantized version recommended)
+ * Fallback: MediaPipe LLM Inference API with local Gemma 2B-IT model
+ * - Works offline
+ * - Requires model download (~2-3 GB)
  * - Place in: app/src/main/assets/models/gemma-2b-it-gpu-int4.bin
- * - Download from: https://www.kaggle.com/models/google/gemma/tfLite/
- * 
- * Alternative models you can use:
- * - Phi-2 (2.7B parameters)
- * - TinyLlama 1.1B
- * - Gemma 1.1-2B-IT
  */
 class TextLLMService(private val context: Context) {
     
     private var llmInference: LlmInference? = null
     private var isInitialized = false
+    private val githubModelsService = GitHubModelsService(context)
     
     companion object {
         private const val MODEL_PATH = "gemma-2b-it-gpu-int4.bin"
@@ -99,6 +98,8 @@ class TextLLMService(private val context: Context) {
     /**
      * Generate 1-2 comprehension questions based on chapter content
      * 
+     * Uses GitHub Models API if authenticated, otherwise falls back to local model
+     * 
      * @param chapterContent The full text of the chapter
      * @param chapterNumber The chapter number (for context)
      * @param numQuestions Number of questions to generate (1-2)
@@ -109,8 +110,19 @@ class TextLLMService(private val context: Context) {
         chapterNumber: Int,
         numQuestions: Int = 1
     ): List<GeneratedQuestion> = withContext(Dispatchers.IO) {
+        // Try GitHub Models API first
+        val githubResult = githubModelsService.generateQuestions(chapterContent, numQuestions)
+        
+        if (githubResult.isSuccess) {
+            android.util.Log.d("TextLLMService", "Using GitHub Models API for question generation")
+            return@withContext githubResult.getOrNull() ?: getFallbackQuestions()
+        }
+        
+        // Fall back to local model
+        android.util.Log.d("TextLLMService", "Falling back to local model: ${githubResult.exceptionOrNull()?.message}")
+        
         if (!isInitialized || llmInference == null) {
-            android.util.Log.w("TextLLMService", "LLM not initialized, returning fallback questions")
+            android.util.Log.w("TextLLMService", "Local model not initialized, returning fallback questions")
             return@withContext getFallbackQuestions()
         }
         
@@ -128,13 +140,15 @@ class TextLLMService(private val context: Context) {
             // Parse JSON response
             parseQuestionsFromResponse(response)
         } catch (e: Exception) {
-            android.util.Log.e("TextLLMService", "Error generating questions: ${e.message}", e)
+            android.util.Log.e("TextLLMService", "Error generating questions with local model: ${e.message}", e)
             getFallbackQuestions()
         }
     }
     
     /**
      * Evaluate user's answer against chapter content
+     * 
+     * Uses GitHub Models API if authenticated, otherwise falls back to local model
      * 
      * @param userAnswer The answer provided by the user
      * @param question The question that was asked
@@ -146,8 +160,19 @@ class TextLLMService(private val context: Context) {
         question: String,
         chapterContent: String
     ): EvaluationResult = withContext(Dispatchers.IO) {
+        // Try GitHub Models API first
+        val githubResult = githubModelsService.evaluateAnswer(question, userAnswer, chapterContent)
+        
+        if (githubResult.isSuccess) {
+            android.util.Log.d("TextLLMService", "Using GitHub Models API for answer evaluation")
+            return@withContext githubResult.getOrNull() ?: fallbackEvaluation(userAnswer)
+        }
+        
+        // Fall back to local model
+        android.util.Log.d("TextLLMService", "Falling back to local model: ${githubResult.exceptionOrNull()?.message}")
+        
         if (!isInitialized || llmInference == null) {
-            android.util.Log.w("TextLLMService", "LLM not initialized, using fallback evaluation")
+            android.util.Log.w("TextLLMService", "Local model not initialized, using fallback evaluation")
             return@withContext fallbackEvaluation(userAnswer)
         }
         
@@ -165,7 +190,7 @@ class TextLLMService(private val context: Context) {
             // Parse evaluation from response
             parseEvaluationFromResponse(response)
         } catch (e: Exception) {
-            android.util.Log.e("TextLLMService", "Error evaluating answer: ${e.message}", e)
+            android.util.Log.e("TextLLMService", "Error evaluating answer with local model: ${e.message}", e)
             fallbackEvaluation(userAnswer)
         }
     }

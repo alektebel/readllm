@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.lifecycleScope
@@ -46,7 +47,6 @@ import com.readllm.app.ui.theme.ReadingThemes
 import com.readllm.app.ui.theme.ReadLLMTheme
 import kotlinx.coroutines.launch
 import java.io.File
-import kotlin.math.abs
 
 class ReaderActivity : ComponentActivity() {
     
@@ -386,7 +386,8 @@ fun ReaderScreen(
     
     // Swipe gesture state
     var dragOffset by remember { mutableStateOf(0f) }
-    val swipeThreshold = 300f
+    var isDragging by remember { mutableStateOf(false) }
+    val swipeThreshold = 200f  // Reduced threshold for easier swiping
     
     // Convert HTML to AnnotatedString for paragraph mode
     val annotatedText = remember(chapterContent) {
@@ -400,15 +401,14 @@ fun ReaderScreen(
             Column {
                 TopAppBar(
                     title = { 
-                        Column {
+                        if (totalChapters > 0 && chapters.isNotEmpty()) {
+                            Text(
+                                text = chapters.getOrNull(currentChapter)?.title ?: "Chapter ${currentChapter + 1}",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        } else {
                             Text(book?.title ?: "Loading...")
-                            if (totalChapters > 0 && chapters.isNotEmpty()) {
-                                Text(
-                                    text = chapters.getOrNull(currentChapter)?.title ?: "Chapter ${currentChapter + 1}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1
-                                )
-                            }
                         }
                     },
                     navigationIcon = {
@@ -521,44 +521,6 @@ fun ReaderScreen(
                         speechRate = newRate
                     }
                 )
-            } else {
-                // Chapter navigation
-                Surface(
-                    tonalElevation = 3.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = { 
-                                if (currentChapter > 0) {
-                                    onChapterChange(currentChapter - 1)
-                                }
-                            },
-                            enabled = currentChapter > 0
-                        ) {
-                            Icon(Icons.Default.NavigateBefore, contentDescription = null)
-                            Text("Previous")
-                        }
-                        
-                        Button(
-                            onClick = { 
-                                if (currentChapter < totalChapters - 1) {
-                                    onChapterChange(currentChapter + 1)
-                                }
-                            },
-                            enabled = currentChapter < totalChapters - 1
-                        ) {
-                            Text("Next")
-                            Icon(Icons.Default.NavigateNext, contentDescription = null)
-                        }
-                    }
-                }
             }
         }
     ) { paddingValues ->
@@ -574,10 +536,15 @@ fun ReaderScreen(
                     .verticalScroll(scrollState)
                     .then(
                         if (enableSwipeNavigation) {
-                            Modifier.pointerInput(Unit) {
+                            Modifier.pointerInput(currentChapter, totalChapters) {
                                 detectHorizontalDragGestures(
+                                    onDragStart = {
+                                        isDragging = true
+                                        dragOffset = 0f
+                                    },
                                     onDragEnd = {
-                                        if (abs(dragOffset) > swipeThreshold) {
+                                        isDragging = false
+                                        if (kotlin.math.abs(dragOffset) > swipeThreshold) {
                                             if (dragOffset > 0 && currentChapter > 0) {
                                                 // Swipe right - previous chapter
                                                 onChapterChange(currentChapter - 1)
@@ -589,10 +556,17 @@ fun ReaderScreen(
                                         dragOffset = 0f
                                     },
                                     onDragCancel = {
+                                        isDragging = false
                                         dragOffset = 0f
                                     },
-                                    onHorizontalDrag = { _, dragAmount ->
+                                    onHorizontalDrag = { change, dragAmount ->
+                                        // Only accumulate horizontal drag
                                         dragOffset += dragAmount
+                                        
+                                        // Consume the change if we're past threshold to prevent scrolling
+                                        if (kotlin.math.abs(dragOffset) > 50f) {
+                                            change.consume()
+                                        }
                                     }
                                 )
                             }
