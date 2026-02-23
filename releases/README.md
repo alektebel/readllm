@@ -2,7 +2,7 @@
 
 ## 📱 Latest Release
 
-**[readllm-v1.5.2-release.apk](readllm-v1.5.2-release.apk)** (93 MB) - **RECOMMENDED**
+**[ReadLLM-1.5.2.apk](ReadLLM-1.5.2.apk)** (93 MB) - **RECOMMENDED**
 
 **Note:** This is an unsigned APK. You may need to enable "Install from Unknown Sources" in your Android settings.
 
