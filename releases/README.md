@@ -1,14 +1,37 @@
-# ReadLLM v1.0 - Release Notes
+# ReadLLM Releases
 
-## 📱 Download
+## 📱 Latest Release
 
-**[readllm-v1.0-release.apk](readllm-v1.0-release.apk)** (92 MB)
+**[readllm-v1.1-release.apk](readllm-v1.1-release.apk)** (93 MB) - **RECOMMENDED**
 
 **Note:** This is an unsigned APK. You may need to enable "Install from Unknown Sources" in your Android settings.
 
 ---
 
-## 🎉 What's New in v1.0
+## 🎉 What's New in v1.1 (Security & Stability Update)
+
+### 🔒 Security Improvements
+- **Encrypted token storage** - OAuth tokens now stored with AES256-GCM encryption
+- **Fixed XXE vulnerability** - XML parser properly secured against external entity attacks
+- **Input validation** - File imports validated for size, type, and path traversal attacks
+- **Secure configuration** - CLIENT_ID moved to local.properties (no hardcoded secrets)
+
+### 🐛 Critical Bug Fixes
+- **Fixed ANR crash** - Resolved infinite flow collection bug in book scanning
+- **Fixed OAuth hang** - Replaced busy-wait loop with proper async handling
+- **Fixed main thread I/O** - All file operations moved to background threads
+- **Better error handling** - Improved error states throughout the app
+
+### ⚡ Performance Improvements
+- All I/O operations now run on background threads
+- Eliminated blocking operations that caused app freezes
+- Better coroutine management
+
+---
+
+## Previous Versions
+
+### v1.0 - Initial Release
 
 ### 🤖 GitHub OAuth for AI-Powered Q&A
 - **No more large downloads!** Use GitHub Models API instead of downloading 2-3GB models

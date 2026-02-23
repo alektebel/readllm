@@ -4,12 +4,10 @@ import android.content.Context
 import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import com.readllm.app.BuildConfig
+import kotlinx.coroutines.suspendCancellableCoroutine
 import net.openid.appauth.*
+import kotlin.coroutines.resume
 
 /**
  * GitHub OAuth Service
@@ -30,24 +28,21 @@ import net.openid.appauth.*
  */
 class GitHubAuthService(private val context: Context) {
     
-    private val Context.dataStore by preferencesDataStore(name = "github_auth")
+    private val secureStorage = SecureTokenStorage(context)
     
     companion object {
         // GitHub OAuth endpoints
         private const val AUTHORIZATION_ENDPOINT = "https://github.com/login/oauth/authorize"
         private const val TOKEN_ENDPOINT = "https://github.com/login/oauth/access_token"
         
-        // TODO: Replace with your GitHub OAuth App Client ID
-        // Get this from: https://github.com/settings/developers
-        private const val CLIENT_ID = "YOUR_GITHUB_CLIENT_ID"
+        // GitHub OAuth Client ID - read from BuildConfig (configured in local.properties)
+        // To configure: add GITHUB_CLIENT_ID=your_client_id to local.properties
+        // Get your Client ID from: https://github.com/settings/developers
+        private val CLIENT_ID = BuildConfig.GITHUB_CLIENT_ID
         private const val REDIRECT_URI = "com.readllm.app://oauth"
         
         // Scopes needed for GitHub Models API
         private const val SCOPES = "read:user"
-        
-        // DataStore keys
-        private val ACCESS_TOKEN_KEY = stringPreferencesKey("github_access_token")
-        private val USER_LOGIN_KEY = stringPreferencesKey("github_user_login")
     }
     
     private val serviceConfig = AuthorizationServiceConfiguration(
@@ -56,28 +51,24 @@ class GitHubAuthService(private val context: Context) {
     )
     
     /**
-     * Get stored access token
-     */
-    val accessToken: Flow<String?> = context.dataStore.data.map { preferences ->
-        preferences[ACCESS_TOKEN_KEY]
-    }
-    
-    /**
-     * Get stored user login
-     */
-    val userLogin: Flow<String?> = context.dataStore.data.map { preferences ->
-        preferences[USER_LOGIN_KEY]
-    }
-    
-    /**
      * Check if user is authenticated
      */
-    suspend fun isAuthenticated(): Boolean {
-        var authenticated = false
-        context.dataStore.data.collect { preferences ->
-            authenticated = preferences[ACCESS_TOKEN_KEY] != null
-        }
-        return authenticated
+    fun isAuthenticated(): Boolean {
+        return secureStorage.isAuthenticated()
+    }
+    
+    /**
+     * Get access token
+     */
+    fun getAccessToken(): String? {
+        return secureStorage.getAccessToken()
+    }
+    
+    /**
+     * Get user login
+     */
+    fun getUserLogin(): String? {
+        return secureStorage.getUserLogin()
     }
     
     /**
@@ -128,30 +119,23 @@ class GitHubAuthService(private val context: Context) {
             val authService = AuthorizationService(context)
             val tokenRequest = response.createTokenExchangeRequest()
             
-            // This is a blocking call - should be called from coroutine
-            var tokenResponse: TokenResponse? = null
-            var error: AuthorizationException? = null
-            
-            authService.performTokenRequest(tokenRequest) { resp, ex ->
-                tokenResponse = resp
-                error = ex
+            // Use suspendCancellableCoroutine to properly await callback
+            val tokenResponse = suspendCancellableCoroutine<TokenResponse> { continuation ->
+                authService.performTokenRequest(tokenRequest) { resp, ex ->
+                    if (ex != null) {
+                        continuation.cancel(ex)
+                    } else if (resp != null) {
+                        continuation.resume(resp)
+                    } else {
+                        continuation.cancel(Exception("No token response received"))
+                    }
+                }
             }
             
-            // Wait for response (in real implementation, use suspendCancellableCoroutine)
-            while (tokenResponse == null && error == null) {
-                kotlinx.coroutines.delay(100)
-            }
+            val token = tokenResponse.accessToken ?: return Result.failure(Exception("No access token"))
             
-            if (error != null) {
-                return Result.failure(error!!)
-            }
-            
-            val token = tokenResponse?.accessToken ?: return Result.failure(Exception("No access token"))
-            
-            // Store token
-            context.dataStore.edit { preferences ->
-                preferences[ACCESS_TOKEN_KEY] = token
-            }
+            // Store token securely
+            secureStorage.saveAccessToken(token)
             
             Result.success(token)
         } catch (e: Exception) {
@@ -162,31 +146,15 @@ class GitHubAuthService(private val context: Context) {
     /**
      * Save access token and user info
      */
-    suspend fun saveAuth(token: String, userLogin: String) {
-        context.dataStore.edit { preferences ->
-            preferences[ACCESS_TOKEN_KEY] = token
-            preferences[USER_LOGIN_KEY] = userLogin
-        }
+    fun saveAuth(token: String, userLogin: String) {
+        secureStorage.saveAccessToken(token)
+        secureStorage.saveUserLogin(userLogin)
     }
     
     /**
      * Clear authentication
      */
-    suspend fun clearAuth() {
-        context.dataStore.edit { preferences ->
-            preferences.remove(ACCESS_TOKEN_KEY)
-            preferences.remove(USER_LOGIN_KEY)
-        }
-    }
-    
-    /**
-     * Get current access token (suspend function)
-     */
-    suspend fun getAccessToken(): String? {
-        var token: String? = null
-        context.dataStore.data.collect { preferences ->
-            token = preferences[ACCESS_TOKEN_KEY]
-        }
-        return token
+    fun clearAuth() {
+        secureStorage.clearAuth()
     }
 }

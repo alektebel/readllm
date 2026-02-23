@@ -19,6 +19,13 @@ android {
         
         // AppAuth redirect scheme
         manifestPlaceholders["appAuthRedirectScheme"] = "com.readllm.app"
+        
+        // GitHub OAuth Client ID - read from local.properties or environment variable
+        // To set: add GITHUB_CLIENT_ID=your_client_id to local.properties
+        val githubClientId = project.findProperty("GITHUB_CLIENT_ID") as String? 
+            ?: System.getenv("GITHUB_CLIENT_ID") 
+            ?: "YOUR_GITHUB_CLIENT_ID"
+        buildConfigField("String", "GITHUB_CLIENT_ID", "\"$githubClientId\"")
     }
 
     buildTypes {
@@ -50,6 +57,7 @@ android {
     buildFeatures {
         viewBinding = true
         compose = true
+        buildConfig = true
     }
     
     composeOptions {
@@ -123,6 +131,9 @@ dependencies {
     
     // OAuth for GitHub authentication
     implementation("net.openid:appauth:0.11.1")
+    
+    // Security - Encrypted SharedPreferences for secure token storage
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     
     // Testing
     testImplementation("junit:junit:4.13.2")

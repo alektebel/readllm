@@ -28,6 +28,8 @@ import com.readllm.app.scanner.BookScanner
 import com.readllm.app.ui.library.EnhancedLibraryScreen
 import com.readllm.app.ui.settings.SettingsScreen
 import com.readllm.app.ui.theme.ReadLLMTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -67,19 +69,16 @@ class MainActivity : ComponentActivity() {
     }
     
     private fun scanDeviceForBooks() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val scannedBooks = bookScanner.scanForBooks()
                 
+                // Get existing books once using first() instead of collect
+                val existingBooks = bookRepository.allBooks.first()
+                
                 scannedBooks.forEach { scanned ->
                     // Check if book already exists in database
-                    val existingBooks = bookRepository.allBooks
-                    var alreadyExists = false
-                    
-                    existingBooks.collect { books ->
-                        alreadyExists = books.any { it.filePath == scanned.filePath }
-                        return@collect
-                    }
+                    val alreadyExists = existingBooks.any { it.filePath == scanned.filePath }
                     
                     if (!alreadyExists) {
                         // Parse EPUB to get metadata
@@ -197,16 +196,47 @@ class MainActivity : ComponentActivity() {
     }
     
     private fun importEpubFile(uri: Uri) {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
-                // Copy file to app's internal storage
+                // Validate file type
+                val mimeType = contentResolver.getType(uri)
+                if (mimeType != "application/epub+zip" && !uri.toString().endsWith(".epub", ignoreCase = true)) {
+                    // TODO: Show error to user - invalid file type
+                    return@launch
+                }
+                
+                // Validate file size (max 100MB to prevent DoS)
+                val fileDescriptor = contentResolver.openFileDescriptor(uri, "r")
+                val fileSize = fileDescriptor?.statSize ?: 0
+                fileDescriptor?.close()
+                
+                if (fileSize > 100 * 1024 * 1024) {
+                    // TODO: Show error to user - file too large
+                    return@launch
+                }
+                
+                if (fileSize == 0L) {
+                    // TODO: Show error to user - empty file
+                    return@launch
+                }
+                
+                // Generate safe filename (prevent path traversal)
                 val fileName = "book_${System.currentTimeMillis()}.epub"
                 val destFile = File(filesDir, fileName)
+                
+                // Ensure file is created in app's directory (not arbitrary location)
+                if (!destFile.canonicalPath.startsWith(filesDir.canonicalPath)) {
+                    // TODO: Show error to user - invalid file path
+                    return@launch
+                }
                 
                 contentResolver.openInputStream(uri)?.use { input ->
                     FileOutputStream(destFile).use { output ->
                         input.copyTo(output)
                     }
+                } ?: run {
+                    // TODO: Show error to user - cannot read file
+                    return@launch
                 }
                 
                 // Parse EPUB to get metadata

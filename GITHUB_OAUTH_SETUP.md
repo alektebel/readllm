@@ -33,21 +33,34 @@ After creating the app:
 1. You'll see your **Client ID** on the app page
 2. Copy this ID (you'll need it in the next step)
 
-### Step 3: Update the App
+### Step 3: Configure the App
 
-1. Open `app/src/main/java/com/readllm/app/auth/GitHubAuthService.kt`
-2. Find this line:
-   ```kotlin
-   private const val CLIENT_ID = "YOUR_GITHUB_CLIENT_ID"
+You have two options to configure your Client ID:
+
+#### Option A: Using local.properties (Recommended)
+
+1. Open or create `local.properties` file in your project root (same level as `build.gradle.kts`)
+2. Add this line:
+   ```properties
+   GITHUB_CLIENT_ID=Iv1.abc123def456
    ```
-3. Replace `YOUR_GITHUB_CLIENT_ID` with your actual Client ID from Step 2:
-   ```kotlin
-   private const val CLIENT_ID = "Iv1.abc123def456"  // Your actual ID
-   ```
+   (Replace with your actual Client ID from Step 2)
+3. Save the file
 
-### Step 4: Update AndroidManifest.xml
+**Note:** `local.properties` is automatically gitignored, so your Client ID won't be committed to version control.
 
-Add the OAuth callback intent filter to your `AndroidManifest.xml`:
+#### Option B: Using Environment Variable
+
+Set an environment variable before building:
+
+```bash
+export GITHUB_CLIENT_ID=Iv1.abc123def456
+./gradlew build
+```
+
+### Step 4: Update AndroidManifest.xml (Already Done)
+
+Add the OAuth callback intent filter to your `AndroidManifest.xml` (this is already done in the current version):
 
 ```xml
 <activity
@@ -131,10 +144,11 @@ If GitHub OAuth is not configured or user is offline, the app automatically fall
 
 ## Security Notes
 
+- Client ID is configured via `local.properties` which is gitignored by default
 - Never commit your Client ID to public repositories
-- Use environment variables or build configs for production
+- Tokens are stored securely using Android EncryptedSharedPreferences (AES256-GCM encryption)
 - The app only requests `read:user` scope (minimal permissions)
-- Tokens are stored securely using Android DataStore
+- All token storage is encrypted at rest
 
 ## GitHub Models API
 
