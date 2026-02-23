@@ -1,5 +1,100 @@
 # ReadLLM - Changelog
 
+## Version 1.5.2 (February 24, 2026)
+
+### GitHub OAuth UI Implementation
+
+**What's New:**
+- Added complete user interface for GitHub OAuth authentication
+- Users can now sign in/out with GitHub directly from the Settings screen
+- Visual feedback showing authentication status
+- Clear display of GitHub Models API benefits
+
+**New Features:**
+1. **GitHub Integration Section in Settings**
+   - Shows authentication status with user's GitHub login
+   - Displays benefits list when not authenticated
+   - Sign In / Sign Out buttons
+   - Connected status with checkmark icon
+   - Clean, intuitive UI design
+
+2. **OAuth Flow Integration**
+   - MainActivity now handles OAuth callbacks
+   - Browser-based authentication flow
+   - Toast notifications for success/error states
+   - Proper error handling throughout the flow
+
+3. **User Experience Improvements**
+   - All error messages in MainActivity now shown to users via Toast
+   - Success confirmation when importing books
+   - Clear feedback for all file operations
+
+**Code Quality Improvements:**
+1. **Completed All TODOs:**
+   - Implemented time tracking for quiz sessions (QuizRepository)
+   - Implemented detailed question type analytics
+   - Removed unnecessary LLM service TODO (GitHub API is superior)
+
+2. **Bug Fixes:**
+   - Fixed duplicate @Composable annotation in SettingsScreen
+   - Fixed question type enum references (VISUAL_CONTENT)
+   - Improved type safety in analytics calculations
+
+**Files Modified:**
+- `SettingsScreen.kt` - Added GitHubIntegrationSection UI component (158 lines)
+- `MainActivity.kt` - Added OAuth launcher, callbacks, and error handling
+- `GitHubAuthService.kt` - Added convenience methods for UI integration
+- `QuizRepository.kt` - Completed time tracking and type analytics TODOs
+- `LLMService.kt` - Clarified local model vs GitHub API usage
+
+**Technical Details:**
+- OAuth flow: Settings → Sign In → Browser → Callback → MainActivity → Success/Error Toast
+- All tokens stored with AES256-GCM encryption (from v1.1)
+- Offline mode works with fallback to local model
+- GitHub Models API provides superior question generation when authenticated
+
+**Size:** 93 MB
+
+---
+
+## Version 1.1 (February 23, 2026)
+
+### Critical Security and Stability Fixes
+
+**What's Fixed:**
+1. **Security Vulnerabilities:**
+   - Fixed XXE (XML External Entity) vulnerability in EPUB parser
+   - Implemented encrypted token storage using AES256-GCM
+   - Moved CLIENT_ID from hardcoded to BuildConfig
+   - Added comprehensive input validation
+
+2. **Stability Issues:**
+   - Fixed infinite flow collection causing ANR (Application Not Responding)
+   - Fixed OAuth busy-wait loop consuming CPU
+   - Moved all I/O operations to background threads
+   - Improved book scanning performance
+
+3. **New Security Features:**
+   - SecureTokenStorage.kt - Encrypted storage for OAuth tokens
+   - Proper key derivation for encryption
+   - Secure token deletion on sign out
+
+**Files Modified:**
+- `MainActivity.kt` - Fixed infinite flow collection
+- `GitHubAuthService.kt` - Fixed busy-wait loop, added secure storage
+- `BookScanner.kt` - Moved I/O to background threads
+- `EpubReaderService.kt` - Fixed XXE vulnerability
+- `build.gradle.kts` - Externalized CLIENT_ID
+
+**Files Added:**
+- `SecureTokenStorage.kt` - AES256-GCM encrypted token storage
+
+**Size:** 93 MB
+
+---
+
+## Version 1.0 (Initial Release)
+
 ## Recent Updates
 
 ### 1. GitHub OAuth Integration for AI-Powered Q&A

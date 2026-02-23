@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.readllm.app.auth.GitHubAuthService
 import com.readllm.app.llm.ModelDownloadService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -360,7 +361,9 @@ class AppSettings(private val context: Context) {
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    appSettings: AppSettings = AppSettings(LocalContext.current)
+    appSettings: AppSettings = AppSettings(LocalContext.current),
+    onGitHubSignIn: () -> Unit = {},
+    onGitHubSignOut: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -669,6 +672,12 @@ fun SettingsScreen(
                     )
                 }
             }
+            
+            // GitHub Integration Section
+            GitHubIntegrationSection(
+                onSignIn = onGitHubSignIn,
+                onSignOut = onGitHubSignOut
+            )
             
             // Text-to-Speech Settings
             SettingsSection(title = "Text-to-Speech") {
@@ -1045,4 +1054,155 @@ fun SettingsRadioGroup(
             }
         }
     }
+}
+
+@Composable
+fun GitHubIntegrationSection(
+    onSignIn: () -> Unit,
+    onSignOut: () -> Unit
+) {
+    val context = LocalContext.current
+    val authService = remember { GitHubAuthService(context) }
+    var isAuthenticated by remember { mutableStateOf(authService.isAuthenticated()) }
+    var userLogin by remember { mutableStateOf(authService.getUserLogin()) }
+    
+    // Update auth state when composition is recomposed
+    LaunchedEffect(Unit) {
+        isAuthenticated = authService.isAuthenticated()
+        userLogin = authService.getUserLogin()
+    }
+    
+    SettingsSection(title = "GitHub Integration") {
+        if (isAuthenticated) {
+            // Authenticated state - show user info and sign out
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Connected to GitHub",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        userLogin?.let { login ->
+                            Text(
+                                text = "@$login",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Text(
+                    text = "Using GitHub Models API for AI-powered questions",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 40.dp)
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                OutlinedButton(
+                    onClick = {
+                        onSignOut()
+                        isAuthenticated = false
+                        userLogin = null
+                    },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Logout,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sign Out")
+                }
+            }
+        } else {
+            // Not authenticated - show sign in button
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Code,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "GitHub Models API",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Get better AI-powered questions",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Benefits list
+                Column(
+                    modifier = Modifier.padding(start = 40.dp)
+                ) {
+                    BenefitItem("✓ Access to GPT-4o-mini, Llama 3, Phi-3")
+                    BenefitItem("✓ No model download required (saves ~2GB)")
+                    BenefitItem("✓ Higher quality questions and evaluation")
+                    BenefitItem("✓ Free tier available")
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(
+                    onClick = onSignIn,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Login,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sign in with GitHub")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BenefitItem(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = 2.dp)
+    )
 }

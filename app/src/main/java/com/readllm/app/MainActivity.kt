@@ -1,8 +1,10 @@
 package com.readllm.app
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -13,6 +15,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
+import com.readllm.app.auth.GitHubAuthService
 import com.readllm.app.database.AppDatabase
 import com.readllm.app.model.Book
 import com.readllm.app.model.BookFormat
@@ -31,6 +34,8 @@ import com.readllm.app.ui.theme.ReadLLMTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import net.openid.appauth.AuthorizationException
+import net.openid.appauth.AuthorizationResponse
 import java.io.File
 import java.io.FileOutputStream
 
@@ -43,6 +48,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var readingSettingsRepository: ReadingSettingsRepository
     private lateinit var readingSessionRepository: ReadingSessionRepository
     private lateinit var bookScanner: BookScanner
+    private lateinit var githubAuthService: GitHubAuthService
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +61,7 @@ class MainActivity : ComponentActivity() {
         readingSettingsRepository = ReadingSettingsRepository(database.readingSettingsDao())
         readingSessionRepository = ReadingSessionRepository(database.readingSessionDao())
         bookScanner = BookScanner(this)
+        githubAuthService = GitHubAuthService(this)
         
         setContent {
             ReadLLMTheme {
@@ -64,6 +71,17 @@ class MainActivity : ComponentActivity() {
                 ) {
                     LibraryScreenWrapper()
                 }
+            }
+        }
+    }
+    
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        
+        // Handle OAuth redirect
+        intent?.data?.let { uri ->
+            if (uri.scheme == "com.readllm.app" && uri.host == "oauth") {
+                handleOAuthCallback(intent)
             }
         }
     }
@@ -132,7 +150,13 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                // TODO: Show error to user
+                lifecycleScope.launch(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Error scanning books: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
     }
@@ -141,6 +165,15 @@ class MainActivity : ComponentActivity() {
     private fun LibraryScreenWrapper() {
         var books by remember { mutableStateOf<List<Book>>(emptyList()) }
         var showSettings by remember { mutableStateOf(false) }
+        
+        // OAuth launcher
+        val oauthLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                result.data?.let { handleOAuthCallback(it) }
+            }
+        }
         
         // Collect books from repository
         LaunchedEffect(Unit) {
@@ -157,7 +190,15 @@ class MainActivity : ComponentActivity() {
         }
         
         if (showSettings) {
-            SettingsScreen(onBack = { showSettings = false })
+            SettingsScreen(
+                onBack = { showSettings = false },
+                onGitHubSignIn = {
+                    startGitHubOAuth(oauthLauncher)
+                },
+                onGitHubSignOut = {
+                    handleGitHubSignOut()
+                }
+            )
         } else {
             EnhancedLibraryScreen(
                 books = books,
@@ -195,13 +236,61 @@ class MainActivity : ComponentActivity() {
         }
     }
     
+    private fun startGitHubOAuth(launcher: androidx.activity.result.ActivityResultLauncher<Intent>) {
+        val authRequest = githubAuthService.buildAuthorizationRequest()
+        val authIntent = githubAuthService.getAuthorizationIntent(authRequest)
+        launcher.launch(authIntent)
+    }
+    
+    private fun handleOAuthCallback(intent: Intent) {
+        val response = AuthorizationResponse.fromIntent(intent)
+        val exception = AuthorizationException.fromIntent(intent)
+        
+        lifecycleScope.launch {
+            when {
+                response != null -> {
+                    val result = githubAuthService.handleAuthResponse(response)
+                    if (result.isSuccess) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Successfully signed in with GitHub!",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Failed to authenticate: ${result.exceptionOrNull()?.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+                exception != null -> {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Authentication cancelled or failed",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+    
+    private fun handleGitHubSignOut() {
+        githubAuthService.clearAuth()
+        Toast.makeText(
+            this,
+            "Signed out from GitHub",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+    
     private fun importEpubFile(uri: Uri) {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 // Validate file type
                 val mimeType = contentResolver.getType(uri)
                 if (mimeType != "application/epub+zip" && !uri.toString().endsWith(".epub", ignoreCase = true)) {
-                    // TODO: Show error to user - invalid file type
+                    showError("Invalid file type. Please select an EPUB file.")
                     return@launch
                 }
                 
@@ -211,12 +300,12 @@ class MainActivity : ComponentActivity() {
                 fileDescriptor?.close()
                 
                 if (fileSize > 100 * 1024 * 1024) {
-                    // TODO: Show error to user - file too large
+                    showError("File too large. Maximum size is 100MB.")
                     return@launch
                 }
                 
                 if (fileSize == 0L) {
-                    // TODO: Show error to user - empty file
+                    showError("File is empty or cannot be read.")
                     return@launch
                 }
                 
@@ -226,7 +315,7 @@ class MainActivity : ComponentActivity() {
                 
                 // Ensure file is created in app's directory (not arbitrary location)
                 if (!destFile.canonicalPath.startsWith(filesDir.canonicalPath)) {
-                    // TODO: Show error to user - invalid file path
+                    showError("Invalid file path.")
                     return@launch
                 }
                 
@@ -235,7 +324,7 @@ class MainActivity : ComponentActivity() {
                         input.copyTo(output)
                     }
                 } ?: run {
-                    // TODO: Show error to user - cannot read file
+                    showError("Cannot read file. Please check permissions.")
                     return@launch
                 }
                 
@@ -283,10 +372,29 @@ class MainActivity : ComponentActivity() {
                 )
                 
                 bookRepository.addBook(book)
+                
+                // Show success message
+                lifecycleScope.launch(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Book imported successfully!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
-                // TODO: Show error to user
+                showError("Failed to import book: ${e.message}")
             }
+        }
+    }
+    
+    private fun showError(message: String) {
+        lifecycleScope.launch(Dispatchers.Main) {
+            Toast.makeText(
+                this@MainActivity,
+                message,
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 }

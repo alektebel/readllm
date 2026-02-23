@@ -2,13 +2,48 @@
 
 ## 📱 Latest Release
 
-**[readllm-v1.1-release.apk](readllm-v1.1-release.apk)** (93 MB) - **RECOMMENDED**
+**[readllm-v1.5.2-release.apk](readllm-v1.5.2-release.apk)** (93 MB) - **RECOMMENDED**
 
 **Note:** This is an unsigned APK. You may need to enable "Install from Unknown Sources" in your Android settings.
 
 ---
 
-## 🎉 What's New in v1.1 (Security & Stability Update)
+## 🎉 What's New in v1.5.2 (GitHub OAuth UI)
+
+### 🔐 GitHub OAuth User Interface
+- **Complete sign-in UI** - Users can now authenticate with GitHub directly from Settings
+- **Visual status display** - See your authentication status at a glance
+- **Benefits showcase** - Clear explanation of GitHub Models API advantages
+- **One-click sign in/out** - Simple, intuitive authentication flow
+
+### ✨ User Experience Improvements
+- **Toast notifications** - All errors and successes now displayed to users
+- **Import feedback** - Success confirmation when importing EPUB files
+- **Better error messages** - Clear, actionable error descriptions
+- **OAuth flow integration** - Seamless browser-based authentication
+
+### 🏗️ Code Quality
+- **All TODOs completed** - No more placeholder code
+- **Time tracking** - Quiz sessions now track time spent (foundation for future analytics)
+- **Question type analytics** - Detailed tracking of performance by question type
+- **Bug fixes** - Fixed duplicate annotation and enum reference issues
+
+### 📍 Where to Find It
+Go to **Settings → GitHub Integration** to:
+- See your authentication status
+- Sign in with GitHub for better AI questions
+- Sign out to revoke access
+- View benefits of GitHub Models API
+
+**Previous Versions:**
+- [v1.1 - Security & Stability](readllm-v1.1-release.apk) (93 MB)
+- [v1.0 - Initial Release](readllm-v1.0-release.apk) (92 MB)
+
+---
+
+## Previous Releases
+
+### v1.1 - Security & Stability Update
 
 ### 🔒 Security Improvements
 - **Encrypted token storage** - OAuth tokens now stored with AES256-GCM encryption

@@ -86,6 +86,14 @@ class GitHubAuthService(private val context: Context) {
     }
     
     /**
+     * Get authorization intent for launching
+     */
+    fun getAuthorizationIntent(authRequest: AuthorizationRequest): Intent {
+        val authService = AuthorizationService(context)
+        return authService.getAuthorizationRequestIntent(authRequest)
+    }
+    
+    /**
      * Start OAuth flow
      * Call this from your Activity/Fragment
      */
@@ -97,6 +105,13 @@ class GitHubAuthService(private val context: Context) {
         val authRequest = buildAuthorizationRequest()
         val authIntent = authService.getAuthorizationRequestIntent(authRequest)
         launcher.launch(authIntent)
+    }
+    
+    /**
+     * Handle OAuth response and exchange code for token (overload for single response)
+     */
+    suspend fun handleAuthResponse(response: AuthorizationResponse): Result<String> {
+        return handleAuthResponse(response, null)
     }
     
     /**

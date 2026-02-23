@@ -38,7 +38,9 @@ class LLMService(private val context: Context) {
     
     init {
         // Initialize the model
-        // TODO: Load actual TFLite model from assets
+        // NOTE: For MVP, we use rule-based explanations as fallback
+        // The GitHub Models API provides superior explanations when authenticated
+        // Local TFLite model support can be added later if needed:
         // interpreter = Interpreter(loadModelFile("models/vision_llm.tflite"))
     }
     

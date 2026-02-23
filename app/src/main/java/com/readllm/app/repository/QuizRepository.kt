@@ -38,7 +38,8 @@ class QuizRepository(
         chapterNumber: Int,
         correctAnswers: Int,
         totalQuestions: Int,
-        averageDifficulty: Double
+        averageDifficulty: Double,
+        timeSpentMillis: Long = 0
     ): Long {
         val score = ChapterScoreEntity(
             bookId = bookId,
@@ -47,7 +48,7 @@ class QuizRepository(
             questionsAsked = totalQuestions,
             correctAnswers = correctAnswers,
             scorePercentage = (correctAnswers.toFloat() / totalQuestions * 100),
-            timeSpent = 0 // TODO: Track time
+            timeSpent = timeSpentMillis
         )
         return chapterScoreDao.insertScore(score)
     }
@@ -110,10 +111,31 @@ class QuizRepository(
         val overallScore = (totalCorrect.toFloat() / totalQuestions) * 100
         val avgTime = allScores.map { it.timeSpent }.average().toLong()
         
-        // Find strongest and weakest question types - MVP: Simplified
-        // TODO: Implement detailed type tracking
-        val strongest: ComprehensionQuizService.QuestionType? = null
-        val weakest: ComprehensionQuizService.QuestionType? = null
+        // Find strongest and weakest question types based on stored scores
+        val typeScores = mutableMapOf<ComprehensionQuizService.QuestionType, MutableList<Float>>()
+        
+        allScores.forEach { score ->
+            score.factualScore?.let { 
+                typeScores.getOrPut(ComprehensionQuizService.QuestionType.FACTUAL) { mutableListOf() }.add(it)
+            }
+            score.conceptualScore?.let { 
+                typeScores.getOrPut(ComprehensionQuizService.QuestionType.CONCEPTUAL) { mutableListOf() }.add(it)
+            }
+            score.inferenceScore?.let { 
+                typeScores.getOrPut(ComprehensionQuizService.QuestionType.INFERENCE) { mutableListOf() }.add(it)
+            }
+            score.visualScore?.let { 
+                typeScores.getOrPut(ComprehensionQuizService.QuestionType.VISUAL_CONTENT) { mutableListOf() }.add(it)
+            }
+        }
+        
+        // Calculate average score per question type
+        val typeAverages = typeScores.mapValues { (_, scores) -> 
+            scores.average().toFloat() 
+        }
+        
+        val strongest = typeAverages.maxByOrNull { it.value }?.key
+        val weakest = typeAverages.minByOrNull { it.value }?.key
         
         // Calculate improvement trend (compare recent vs older scores)
         val improvementTrend = if (allScores.size >= 3) {
