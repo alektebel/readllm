@@ -2,13 +2,13 @@
 
 ## 📱 Latest Release
 
-**[ReadLLM-1.5.2.apk](ReadLLM-1.5.2.apk)** (93 MB) - **RECOMMENDED**
+**[ReadLLM-1.5.3.apk](ReadLLM-1.5.3.apk)** (93 MB) - **RECOMMENDED**
 
 **Note:** This is an unsigned APK. You may need to enable "Install from Unknown Sources" in your Android settings.
 
 ---
 
-## 🎉 What's New in v1.5.2 (GitHub OAuth UI)
+## 🎉 What's New in v1.5.3 (GitHub OAuth UI)
 
 ### 🔐 GitHub OAuth User Interface
 - **Complete sign-in UI** - Users can now authenticate with GitHub directly from Settings

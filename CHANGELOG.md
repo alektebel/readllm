@@ -1,6 +1,6 @@
 # ReadLLM - Changelog
 
-## Version 1.5.2 (February 24, 2026)
+## Version 1.5.3 (February 24, 2026)
 
 ### GitHub OAuth UI Implementation
 
